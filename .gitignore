@@ -1,12 +1,29 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# IDE
 .idea/
 .vscode/
+
+# Virtual environment
 .venv/
+venv/
+ENV/
+
+# pytest cache
+.pytest_cache/
+
+# Environment variables
+.env
+.token
+
+# OS
 .DS_Store
-/venv/
-__pycache__/
+
+# Data files
 *.db
 *.xlsx
 *.log
 *.csv
-.token
-.env
