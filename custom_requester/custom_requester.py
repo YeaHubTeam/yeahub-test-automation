@@ -2,18 +2,13 @@ import json
 import logging
 import os
 
-import requests
-
 
 class CustomRequester:
     """
     Кастомный реквестер для стандартизации и упрощения отправки HTTP-запросов.
     """
 
-    base_headers = {
-        "Content-Type": "application/json",
-        "Accept": "application/json"
-    }
+    base_headers = {"Content-Type": "application/json", "Accept": "application/json"}
 
     def __init__(self, session, base_url):
         """
@@ -27,7 +22,15 @@ class CustomRequester:
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.INFO)
 
-    def send_request(self, method, endpoint, params=None, data=None, expected_status=200, need_logging=True):
+    def send_request(
+        self,
+        method,
+        endpoint,
+        params=None,
+        data=None,
+        expected_status=200,
+        need_logging=True,
+    ):
         """
         Универсальный метод для отправки запросов.
         :param method: HTTP метод (GET, POST, PUT, DELETE и т.д.).
@@ -40,9 +43,9 @@ class CustomRequester:
 
         # 🌟 ИСПРАВЛЕНИЕ: Нормализация URL для предотвращения двойного слеша.
         # 1. Убираем слеш в конце base_url (если он есть)
-        base_url_clean = self.base_url.rstrip('/')
+        base_url_clean = self.base_url.rstrip("/")
         # 2. Убираем слеш в начале endpoint (если он есть)
-        endpoint_clean = endpoint.lstrip('/')
+        endpoint_clean = endpoint.lstrip("/")
 
         # 3. Объединяем с одним слешем
         url = f"{base_url_clean}/{endpoint_clean}"
@@ -58,9 +61,10 @@ class CustomRequester:
             expected_status = expected_status
 
         if response.status_code not in expected_status:
-            raise ValueError(f"Unexpected status code: {response.status_code}. Expected: {expected_status}")
+            raise ValueError(
+                f"Unexpected status code: {response.status_code}. Expected: {expected_status}"
+            )
         return response
-
 
     def _update_session_headers(self, **kwargs):
         """
@@ -77,17 +81,19 @@ class CustomRequester:
         """
         try:
             request = response.request
-            GREEN = '\033[32m'
-            RED = '\033[31m'
-            RESET = '\033[0m'
-            headers = " \\\n".join([f"-H '{header}: {value}'" for header, value in request.headers.items()])
+            GREEN = "\033[32m"
+            RED = "\033[31m"
+            RESET = "\033[0m"
+            headers = " \\\n".join(
+                [f"-H '{header}: {value}'" for header, value in request.headers.items()]
+            )
             full_test_name = f"pytest {os.environ.get('PYTEST_CURRENT_TEST', '').replace(' (call)', '')}"
 
             body = ""
-            if hasattr(request, 'body') and request.body is not None:
+            if hasattr(request, "body") and request.body is not None:
                 if isinstance(request.body, bytes):
-                    body = request.body.decode('utf-8')
-                body = f"-d '{body}' \n" if body != '{}' else ''
+                    body = request.body.decode("utf-8")
+                body = f"-d '{body}' \n" if body != "{}" else ""
 
             # Логируем запрос
             self.logger.info(f"\n{'=' * 40} REQUEST {'=' * 40}")
@@ -105,7 +111,9 @@ class CustomRequester:
 
             # Попытка форматировать JSON
             try:
-                response_data = json.dumps(json.loads(response.text), indent=4, ensure_ascii=False)
+                response_data = json.dumps(
+                    json.loads(response.text), indent=4, ensure_ascii=False
+                )
             except json.JSONDecodeError:
                 pass  # Оставляем текст, если это не JSON
 
