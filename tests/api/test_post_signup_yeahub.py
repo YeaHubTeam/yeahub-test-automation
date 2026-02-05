@@ -1,7 +1,7 @@
 from api.api_manager import ApiManager
 
+
 class TestSignUpYeahub:
-    
     def test_post_signup_user_positive(self, api_manager: ApiManager, new_user_data):
         response = api_manager.auth_api.register_user(new_user_data)
         response_data = response.json()

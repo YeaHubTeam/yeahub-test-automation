@@ -1,3 +1,5 @@
 python-dotenv
 pytest
 requests
+ruff==0.15.0
+pre-commit

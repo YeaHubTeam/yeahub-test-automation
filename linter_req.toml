@@ -1,0 +1,47 @@
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+indent-width = 4
+
+# Форматирование (PEP8-based)
+[tool.ruff.format]
+indent-style = "space"
+indent-width = 4
+line-ending = "auto"
+quote-style = "double"
+skip-magic-trailing-comma = false
+
+# Аргументы (split_before_first_argument=true)
+split-before-first-arg = true
+indent-after-comma = true
+split-arguments-when-comma-terminated = true
+
+# Скобки (dedent_closing_brackets=true)
+closing-brackets-next-line = true
+coalesce-brackets = false
+
+# Операторы
+split-before-logical-operator = true
+split-before-arithmetic-operator = true
+
+# Dict multiline (indent value, no split keys)
+indent-continuation-lines = true
+multi-line-output = "mixed"  # inline first, dedent rest
+
+# Join lines off
+join-multiple-lines = false
+
+# Исключения
+exclude = [
+    ".venv/",
+    "__pycache__/",
+    "build/",
+    "dist/",
+    ".ruff_cache/",
+    ".mypy_cache/"
+]
+
+# Линтинг базовый
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "N", "B"]
+ignore = ["E501"]  # line-length контролируем сверху
