@@ -6,11 +6,11 @@ faker = Faker()
 class DataGenerator:
 
     @staticmethod
-    def random_username(self):
+    def random_username():
         return faker.name()
 
     @staticmethod
-    def random_password(self):
+    def random_password():
         letters = random.choice(string.ascii_letters)
         digits = random.choice(string.digits)
 
@@ -25,34 +25,34 @@ class DataGenerator:
         return ''.join(password)
 
     @staticmethod
-    def random_email(self):
+    def random_email():
         random_string = ''.join(random.choices(string.ascii_lowercase + string.ascii_uppercase + string.digits, k=10))
         return f"{random_string}@yandex.ru"
 
     @staticmethod
-    def random_phone(self):
+    def random_phone():
         number_phone = ''.join(random.choices(string.digits, k=10))
         return f"+{number_phone}"
 
     @staticmethod
-    def random_country(self):
+    def random_country():
         return faker.country()
 
     @staticmethod
-    def random_city(self):
+    def random_city():
         return faker.city()
 
     @staticmethod
-    def random_birthday(self):
+    def random_birthday():
         year = random.randint(1950, 2007)
         month = faker.month()
         day = faker.day_of_month()
         return f"{year}-{month}-{day}"
 
     @staticmethod
-    def random_address(self):
+    def random_address():
         return faker.address()
 
     @staticmethod
-    def random_avatar_url(self):
+    def random_avatar_url():
         return faker.image_url()
