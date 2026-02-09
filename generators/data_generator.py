@@ -3,8 +3,9 @@ import string
 from faker import Faker
 
 faker = Faker()
-class DataGenerator:
 
+
+class DataGenerator:
     @staticmethod
     def random_username():
         return faker.name()
@@ -17,21 +18,20 @@ class DataGenerator:
         special_chars = "?@#$%^&*|:"
         all_chars = string.ascii_letters + string.digits + special_chars
         remaining_length = random.randint(6, 18)
-        remaining_chars = ''.join(random.choices(all_chars, k=remaining_length))
+        remaining_chars = "".join(random.choices(all_chars, k=remaining_length))
 
         password = list(letters + digits + remaining_chars)
         random.shuffle(password)
 
-        return ''.join(password)
+        return "".join(password)
 
     @staticmethod
     def random_email():
-        random_string = ''.join(random.choices(string.ascii_lowercase + string.ascii_uppercase + string.digits, k=10))
-        return f"{random_string}@yandex.ru"
+        return faker.email()
 
     @staticmethod
     def random_phone():
-        number_phone = ''.join(random.choices(string.digits, k=10))
+        number_phone = "".join(random.choices(string.digits, k=10))
         return f"+{number_phone}"
 
     @staticmethod
