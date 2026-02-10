@@ -21,6 +21,10 @@ source .venv/bin/activate  # Linux/Mac
 # Установить зависимости
 pip install -r requirements.txt
 ```
+```
+#Python version 
+Python 3.14.0
+```
 
 ## Запуск тестов
 

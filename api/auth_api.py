@@ -1,11 +1,13 @@
 from typing import Any, Optional, List
-from constants.constants import REGISTER_ENDPOINT, LOGIN_ENDPOINT
+
 from custom_requester.custom_requester import CustomRequester
 
 class AuthAPI(CustomRequester):
     """
     Класс для работы с аутентификацией.
     """
+    REGISTER_ENDPOINT = "/auth/signUp"
+    LOGIN_ENDPOINT = "/auth/login"
 
     def __init__(self, session):
         super().__init__(session=session, base_url="https://api.yeatwork.ru/")
@@ -18,7 +20,7 @@ class AuthAPI(CustomRequester):
         """
         return self.send_request(
             method="POST",
-            endpoint=REGISTER_ENDPOINT,
+            endpoint=self.REGISTER_ENDPOINT,
             data=user_data,
             expected_status=expected_status
         )
@@ -31,7 +33,7 @@ class AuthAPI(CustomRequester):
         """
         return self.send_request(
             method="POST",
-            endpoint=LOGIN_ENDPOINT,
+            endpoint=self.LOGIN_ENDPOINT,
             data=login_data,
             expected_status=expected_status
         )

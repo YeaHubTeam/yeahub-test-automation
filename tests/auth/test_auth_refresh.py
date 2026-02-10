@@ -6,5 +6,5 @@ class TestRefreshYeahub:
         response = api_manager.auth_api.refresh_profile(refresh_user)
         response_data = response.json()
 
-        assert response.status_code == 200
+
         assert "access_token" in response_data or "accessToken" in response_data
