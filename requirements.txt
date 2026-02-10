@@ -10,3 +10,5 @@ pytest==9.0.2
 python-dotenv==1.2.1
 requests==2.32.5
 urllib3==2.6.3
+ruff==0.15.0
+pre-commit
