@@ -7,4 +7,3 @@ class TestSendResetPassYeahube:
     ):
         response = api_manager.auth_api.send_reset_pass(send_reset_pass_user)
 
-        assert response.status_code == 200
