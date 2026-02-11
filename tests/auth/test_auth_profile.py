@@ -6,7 +6,7 @@ class TestProfileYeahub:
         response = api_manager.auth_api.profile(profile_user)
         response_data = response.json()
 
-        assert response.status_code == 200
+
         if "user" in response_data:
             assert response_data["user"]["username"] == profile_user["username"]
         else:

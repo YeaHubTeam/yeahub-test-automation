@@ -96,7 +96,6 @@ def verify_email_user(registered_user):
 
 @pytest.fixture
 def send_verification_email_user(test_login):
-
     return test_login
 
 
