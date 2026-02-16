@@ -1,3 +1,5 @@
+
+
 class Decorator:
     @staticmethod
     def with_overrides(func):

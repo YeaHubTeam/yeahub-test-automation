@@ -6,5 +6,6 @@ class ApiManager:
         self.session = session
         self.auth_api = AuthAPI(session)
 
+
     def close_session(self):
         self.session.close()

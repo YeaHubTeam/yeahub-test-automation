@@ -1,7 +1,7 @@
 from api.api_manager import ApiManager
 
 
-class TestSendResetPassYeahube:
+class TestSendResetPassYeahub:
     def test_get_auth_send_reset_pass_positive(
         self, api_manager: ApiManager, send_reset_pass_user
     ):
