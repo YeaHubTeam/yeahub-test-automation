@@ -61,27 +61,3 @@ def logged_in_user(api_manager, registered_user):
     )
 
     return registered_user
-
-
-
-
-@pytest.fixture
-def reset_password_user(registered_user):
-    return registered_user
-
-
-@pytest.fixture
-def verify_email_user(registered_user):
-    return registered_user
-
-
-@pytest.fixture
-def send_verification_email_user(logged_in_user):
-    return logged_in_user
-
-
-@pytest.fixture
-def verification_user(send_verification_email_user):
-    return send_verification_email_user
-
-
