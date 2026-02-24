@@ -1,5 +1,4 @@
 import allure
-
 from api.api_manager import ApiManager
 import pytest
 
