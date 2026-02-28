@@ -6,4 +6,3 @@ class TestSendResetPassYeahub:
         self, api_manager: ApiManager, send_reset_pass_user
     ):
         response = api_manager.auth_api.send_reset_pass(send_reset_pass_user)
-

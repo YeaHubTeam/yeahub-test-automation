@@ -1,17 +1,19 @@
 from typing import Any, Optional, List
 
 from custom_requester.custom_requester import CustomRequester
+from constants import BASE_URL
 
 
 class AuthAPI(CustomRequester):
     """
     Класс для работы с аутентификацией.
     """
+
     REGISTER_ENDPOINT = "/auth/signUp"
     LOGIN_ENDPOINT = "/auth/login"
 
     def __init__(self, session):
-        super().__init__(session=session, base_url="https://api.yeatwork.ru/")
+        super().__init__(session=session, base_url=BASE_URL)
 
     def register_user(self, user_data, expected_status=201):
         """
@@ -102,22 +104,10 @@ class AuthAPI(CustomRequester):
             expected_status=expected_status,
         )
 
-    def password_exchange(self, user_data=None, expected_status=[200, 400]):
+    def password_exchange(self, user_id, payload, expected_status=200):
         """
         Смена пароля пользователя.
         """
-        user_id = user_data.get("id", 1) if isinstance(user_data, dict) else 1
-
-        password = user_data.get("password")
-        payload = {
-            "password": password,
-            # Use password as passwordConfirm if not provided to avoid null
-            "passwordConfirm": user_data.get("passwordRepeat")
-            or user_data.get("passwordConfirm")
-            or password,
-            "token": user_data.get("token", "dummy_token"),
-        }
-
         return self.send_request(
             method="PATCH",
             endpoint=f"auth/password-change/{user_id}",
