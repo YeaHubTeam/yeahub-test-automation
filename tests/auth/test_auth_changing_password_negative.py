@@ -1,6 +1,7 @@
 import pytest
 
 from utils.data_generator import DataGenerator
+from payloads.auth_payloads import AuthPayloads
 from faker import Faker
 
 faker = Faker()
@@ -51,7 +52,7 @@ class TestPasswordNegative:
         self, test_login, api_manager
     ):
         """Смена пароля и логин под старым паролем"""
-        payload = DataGenerator.payload()
+        payload = AuthPayloads.payload()
         response = api_manager.auth_api.password_exchange(test_login["id"], payload)
         assert response.json().get("access_token") is not None, "Токен не найден"
 

@@ -1,13 +1,14 @@
 import pytest
 
 from utils.data_generator import DataGenerator
+from payloads.auth_payloads import AuthPayloads
 
 
 class TestPasswordPositive:
     @pytest.mark.api
     def test_changing_password(self, test_login, api_manager):
         """Смена пароля"""
-        payload = DataGenerator.payload()
+        payload = AuthPayloads.payload()
         response = api_manager.auth_api.password_exchange(test_login["id"], payload)
         assert response.json().get("access_token") is not None, "Токен не найден"
 
@@ -15,7 +16,7 @@ class TestPasswordPositive:
     @pytest.mark.smoke
     def test_changing_password_and_login(self, test_login, api_manager):
         """Смена пароля и логин под новым паролем"""
-        payload = DataGenerator.payload()
+        payload = AuthPayloads.payload()
         response = api_manager.auth_api.password_exchange(test_login["id"], payload)
         assert response.json().get("access_token") is not None, "Токен не найден"
 

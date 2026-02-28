@@ -57,8 +57,4 @@ class DataGenerator:
     def random_avatar_url():
         return faker.image_url()
 
-    @staticmethod
-    def payload():
-        password = DataGenerator.random_password()
-        payload = {"password": password, "passwordConfirm": password}
-        return payload
+
