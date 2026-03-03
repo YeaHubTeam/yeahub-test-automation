@@ -1,4 +1,4 @@
-from generators.data_generator import DataGenerator
+from utils.data_generator import DataGenerator
 from utils.decorators import Decorator
 
 

@@ -50,61 +50,14 @@ def registered_user(api_manager, test_user):
 
 
 @pytest.fixture
-def test_login(api_manager, registered_user):
+def logged_in_user(api_manager, registered_user):
     login_data = {
         "username": registered_user["email"],
         "password": registered_user["password"],
     }
-    api_manager.auth_api.login_user(login_data, expected_status=201)
+    api_manager.auth_api.login_user(login_data)
     api_manager.auth_api.authenticate(
         (registered_user["email"], registered_user["password"])
     )
 
     return registered_user
-
-
-@pytest.fixture
-def logout_user(test_login):
-    return test_login
-
-
-@pytest.fixture
-def profile_user(test_login):
-    return test_login
-
-
-@pytest.fixture
-def refresh_user(test_login):
-    return test_login
-
-
-@pytest.fixture
-def send_reset_pass_user(registered_user):
-    return registered_user
-
-
-@pytest.fixture
-def reset_password_user(registered_user):
-    return registered_user
-
-
-@pytest.fixture
-def pass_exchange_user(test_login):
-    return test_login
-
-
-@pytest.fixture
-def verify_email_user(registered_user):
-    return registered_user
-
-
-@pytest.fixture
-def send_verification_email_user(test_login):
-    return test_login
-
-
-@pytest.fixture
-def verification_user(send_verification_email_user):
-    return send_verification_email_user
-
-

@@ -1,10 +1,17 @@
 from api.api_manager import ApiManager
+import allure
+import pytest
 
-
+ #TODO - ТЕСТ ТРЕБУЕТ ДОРАБОТКИ! НЕ ГОТОВО!
+ 
+@allure.epic('Тест - Отправка емейла верификации')
+@pytest.mark.api
+@pytest.mark.smoke
+@pytest.mark.skip(reason='Нужен мейлер клиент - Ждем таск: https://tracker.yandex.ru/YH-1756')
 class TestSendVerificationEmailYeahub:
-    def test_get_send_verification_email_positive(
-        self, api_manager: ApiManager, verification_user
-    ):
-        response = api_manager.auth_api.send_verification_email(verification_user)
+    def test_send_verification_email(self, api_manager: ApiManager, logged_in_user):
+        response = api_manager.auth_api.send_verification_email(logged_in_user)
 
         assert response.status_code == 200
+
+
