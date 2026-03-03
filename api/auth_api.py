@@ -77,7 +77,7 @@ class AuthAPI(CustomRequester):
             method="GET", endpoint="auth/refresh", expected_status=200
         )
 
-    #Нужно отрефачить позже. Жду таск - https://tracker.yandex.ru/YH-1738
+    #TODO #Нужно отрефачить позже. Жду таск - https://tracker.yandex.ru/YH-1756
     def verify_sent_email(self, *args, **kwargs):
         """
         Верификация email пользователя.
@@ -92,9 +92,8 @@ class AuthAPI(CustomRequester):
             expected_status=expected_status,
         )
 
-    """
-    #Не доделано! Не использовать пока. Жду таск - https://tracker.yandex.ru/YH-1738 
-    
+
+    #TODO - Не доделано! Не использовать пока. Жду таск - https://tracker.yandex.ru/YH-1756
     def verify_sent_email(self, token, expected_status=200):
         '''
         Верификация email пользователя.
@@ -105,7 +104,7 @@ class AuthAPI(CustomRequester):
             params=token,
             expected_status=expected_status,
         )
-    """
+
 
 
     def send_verification_email(self, user_data=None, expected_status=200):
@@ -143,7 +142,7 @@ class AuthAPI(CustomRequester):
             expected_status=expected_status,
         )
 
-    #Dummy. Требует доработки! Не корректная реализация.
+    #TODO #Dummy. Требует доработки! Не корректная реализация. - Жду таск - https://tracker.yandex.ru/YH-1756
     def reset_password(self, user_data=None, expected_status=200):
         """
         Сброс пароля пользователя.

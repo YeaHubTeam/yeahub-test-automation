@@ -2,12 +2,13 @@ from api.api_manager import ApiManager
 import allure
 import pytest
 
-''' 
-ТЕСТ ТРЕБУЕТ ДОРАБОТКИ! НЕ ГОТОВО! 
+
+#TODO ТЕСТ ТРЕБУЕТ ДОРАБОТКИ! НЕ ГОТОВО!
 
 @allure.epic('Тест - сброса пароля')
 @pytest.mark.api
 @pytest.mark.smoke
+@pytest.mark.skip(reason='Нужен мейлер клиент - Ждем таск: https://tracker.yandex.ru/YH-1756')
 class TestResetPasswordYeahub:
     @allure.severity(allure.severity_level.NORMAL)
     @allure.label("AQA_Engineer", "Nikolay_Martoplyas")
@@ -18,5 +19,5 @@ class TestResetPasswordYeahub:
 
         with allure.step('Проверяем успешность статус кода ответа = 200'):
             assert response.status_code == 200
-'''
+
 
