@@ -1,12 +1,22 @@
 from api.api_manager import ApiManager
+import allure
+import pytest
 
 
+@allure.epic('Тест - Профиль пользователя')
+@pytest.mark.api
+@pytest.mark.smoke
 class TestProfileYeahub:
-    def test_get_auth_profile_positive(self, api_manager: ApiManager, profile_user):
-        response = api_manager.auth_api.profile(profile_user)
-        response_data = response.json()
+    @allure.severity(allure.severity_level.NORMAL)
+    @allure.label("AQA_Engineer", "Nikolay_Martoplyas")
+    @allure.title('Тестирование получения профиля аутентифицированного пользователя')
+    def test_auth_user_profile(self, api_manager: ApiManager, logged_in_user):
+        with allure.step('Оправляем PATCH запрос с данными нового пароля пользователя'):
+            response = api_manager.auth_api.profile(logged_in_user)
+            response_data = response.json()
 
-        if "user" in response_data:
-            assert response_data["user"]["username"] == profile_user["username"]
-        else:
-            assert response_data.get("username") == profile_user["username"]
+        with allure.step('Проверяем, что зареганный пользователь пришел в ответе с профиля'):
+            if "user" in response_data:
+                assert response_data["user"]["username"] == logged_in_user["username"]
+            else:
+                assert response_data.get("username") == logged_in_user["username"]
