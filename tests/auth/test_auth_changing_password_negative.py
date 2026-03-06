@@ -9,25 +9,22 @@ faker = Faker()
 
 class TestPasswordNegative:
     @pytest.mark.api
-    def test_differend_passwords(self, test_login, api_manager):
+    def test_differend_passwords(self, logged_in_user, api_manager):
         """пароль и подьверждение пароля разные"""
-        password = DataGenerator.random_password()
-        password_confirm = DataGenerator.random_password()
-        payload = {"password": password, "passwordConfirm": password_confirm}
-        response = api_manager.auth_api.password_exchange(
-            test_login["id"], payload, expected_status=400
+        payload = AuthPayloads.payload_password(passwordConfirm=DataGenerator.random_password())
+        response = api_manager.auth_api.password_change(
+            logged_in_user["id"], payload, expected_status=400
         )
         assert response.json().get("description") == "Password confirmation failed", (
             "Сообщения не совпадают"
         )
 
     @pytest.mark.api
-    def test_password_confirmation_empty(self, test_login, api_manager):
+    def test_password_confirmation_empty(self, logged_in_user, api_manager):
         """Поле подтверждение пароля отсавляем пустым"""
-        password = DataGenerator.random_password()
-        payload = {"password": password, "passwordConfirm": ""}
-        response = api_manager.auth_api.password_exchange(
-            test_login["id"], payload, expected_status=400
+        payload = AuthPayloads.payload_password(passwordConfirm="")
+        response = api_manager.auth_api.password_change(
+            logged_in_user["id"], payload, expected_status=400
         )
         assert response.json().get("description") == "Password confirmation failed", (
             "Сообщения не совпадают"
@@ -36,30 +33,30 @@ class TestPasswordNegative:
     # TODO убрать маркер xfail после исправления бага
     @pytest.mark.api
     @pytest.mark.xfail(reason="По документации пароль не может быть меньше 8 символов")
-    def test_password_less_than_eight_characters(self, test_login, api_manager):
+    def test_password_less_than_eight_characters(self, logged_in_user, api_manager):
         """Пароль менее 8 символов"""
         password = faker.password(length=5)
-        payload = {"password": password, "passwordConfirm": password}
-        response = api_manager.auth_api.password_exchange(
-            test_login["id"], payload, expected_status=400
+        payload = AuthPayloads.payload_password(password=password, passwordConfirm=password)
+        response = api_manager.auth_api.password_change(
+            logged_in_user["id"], payload, expected_status=400
         )
         assert response.json().get("description") == "Password confirmation failed", (
             "Сообщения не совпадают"
         )
 
     @pytest.mark.api
-    def test_change_password_and_login_using_your_old_password(
-        self, test_login, api_manager
+    def test_login_old_password_after_change(
+        self, logged_in_user, api_manager
     ):
         """Смена пароля и логин под старым паролем"""
-        payload = AuthPayloads.payload()
-        response = api_manager.auth_api.password_exchange(test_login["id"], payload)
+        payload = AuthPayloads.payload_password()
+        response = api_manager.auth_api.password_change(logged_in_user["id"], payload)
         assert response.json().get("access_token") is not None, "Токен не найден"
 
         api_manager.auth_api.logout()
         login_data = {
-            "username": test_login["email"],
-            "password": test_login["password"],
+            "username": logged_in_user["email"],
+            "password": logged_in_user["password"],
         }
         response_login = api_manager.auth_api.login_user(
             login_data, expected_status=401

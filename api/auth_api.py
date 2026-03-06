@@ -121,11 +121,7 @@ class AuthAPI(CustomRequester):
             expected_status=expected_status,
         )
 
-<<<<<<< HEAD
-    def password_exchange(self, user_id, payload, expected_status=200):
-=======
-    def password_change(self, user_data=None, expected_status=200):
->>>>>>> 8b562a4f6df0cfdebdb7b278ac0e616da15c2e04
+    def password_change(self, user_id, payload, expected_status=200):
         """
         Смена пароля пользователя.
         """

@@ -53,14 +53,11 @@ def registered_user(api_manager, test_user):
             "username": test_user["email"],
             "password": test_user["password"],
         }
-        api_manager.auth_api.login_user(login_data, expected_status=201)
         api_manager.auth_api.authenticate((test_user["email"], test_user["password"]))
         api_manager.user_api.delete_user(test_user["id"], expected_status=[404, 401])
-        api_manager.user_api.get_user(test_user["id"], expected_status=[404, 401])
     else:
         api_manager.user_api.delete_user(test_user["id"], expected_status=[404, 401])
-        api_manager.user_api.get_user(test_user["id"], expected_status=[404, 401])
-    # TODO поменять ожидаемый сатус код в teardown в методе "delete_user" и "get_user" на 200 после исправления бага
+    # TODO поменять ожидаемый сатус код в teardown в методе "delete_user" на 200 после исправления бага
 
 
 @pytest.fixture
