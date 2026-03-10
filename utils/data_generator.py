@@ -56,3 +56,5 @@ class DataGenerator:
     @staticmethod
     def random_avatar_url():
         return faker.image_url()
+
+

@@ -20,3 +20,10 @@ class AuthPayloads:
             "refId": "",
         }
         return payloads
+
+    @Decorator.with_overrides
+    @staticmethod
+    def payload_password():
+        password = DataGenerator.random_password()
+        payload = {"password": password, "passwordConfirm": password}
+        return payload
