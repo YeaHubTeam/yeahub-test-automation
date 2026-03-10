@@ -49,14 +49,9 @@ def registered_user(api_manager, test_user):
     if (
         "Authorization" not in api_manager.auth_api.headers
     ):  # Проверяем что пользоватпель не залогинен
-        login_data = {  # Так как чтоб удалить пользователя нужно залогинется
-            "username": test_user["email"],
-            "password": test_user["password"],
-        }
+        # Так как чтоб удалить пользователя нужно залогинется
         api_manager.auth_api.authenticate((test_user["email"], test_user["password"]))
-        api_manager.user_api.delete_user(test_user["id"], expected_status=[404, 401])
-    else:
-        api_manager.user_api.delete_user(test_user["id"], expected_status=[404, 401])
+    api_manager.user_api.delete_user(test_user["id"], expected_status=[404, 401])
     # TODO поменять ожидаемый сатус код в teardown в методе "delete_user" на 200 после исправления бага
 
 
