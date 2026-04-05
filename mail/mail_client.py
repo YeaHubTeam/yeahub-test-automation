@@ -28,7 +28,7 @@ class MailClient:
             self.email,
             self.password,
             self.folder,
-            ) as mailbox:
+        ) as mailbox:
             for msg in mailbox.fetch():
                 messages.append(MailMessage.from_imap_message(msg))
 
@@ -54,7 +54,9 @@ class MailClient:
 
         return max(
             matched_messages,
-            key=lambda message: message.date or datetime.min.replace(tzinfo=timezone.utc),
+            key=lambda message: (
+                message.date or datetime.min.replace(tzinfo=timezone.utc)
+            ),
         )
 
     def get_message_link(self, message: MailMessage) -> str | None:

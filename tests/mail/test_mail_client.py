@@ -1,8 +1,12 @@
-
 from datetime import datetime, timezone
+
+import pytest
 
 from mail.mail_client import MailClient
 from mail.models import MailMessage
+
+
+pytestmark = [pytest.mark.api, pytest.mark.regression]
 
 
 def test_find_message_returns_newest_matching_message(monkeypatch):
