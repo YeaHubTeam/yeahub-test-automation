@@ -20,21 +20,27 @@ class _HrefCollector(HTMLParser):
                 break
 
 
+def _pick_preferred_link(links: list[str]) -> str | None:
+    if not links:
+        return None
+
+    for link in links:
+        if "verify-email" in link:
+            return link
+
+    return links[0]
+
+
 def extract_first_link(text: str | None = None, html: str | None = None) -> str | None:
+    links: list[str] = []
+
     if html:
         parser = _HrefCollector()
         parser.feed(html)
-
-        if parser.hrefs:
-            return parser.hrefs[0]
-
-        html_match = _URL_PATTERN.search(html)
-        if html_match:
-            return html_match.group(0)
+        links.extend(parser.hrefs)
+        links.extend(_URL_PATTERN.findall(html))
 
     if text:
-        text_match = _URL_PATTERN.search(text)
-        if text_match:
-            return text_match.group(0)
+        links.extend(_URL_PATTERN.findall(text))
 
-    return None
+    return _pick_preferred_link(links)
