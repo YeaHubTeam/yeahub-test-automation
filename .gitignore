@@ -14,6 +14,8 @@ ENV/
 
 # pytest cache
 .pytest_cache/
+allure-results/
+allure-report/
 
 # Environment variables
 .env
