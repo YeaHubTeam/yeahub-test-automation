@@ -20,18 +20,18 @@ class _HrefCollector(HTMLParser):
                 break
 
 
-def _pick_preferred_link(links: list[str]) -> str | None:
-    if not links:
-        return None
-
+def _pick_verification_link(links: list[str]) -> str | None:
     for link in links:
         if "verify-email" in link:
             return link
 
-    return links[0]
+    return None
 
 
-def extract_first_link(text: str | None = None, html: str | None = None) -> str | None:
+def extract_verification_link(
+    text: str | None = None,
+    html: str | None = None,
+) -> str | None:
     links: list[str] = []
 
     if html:
@@ -43,4 +43,4 @@ def extract_first_link(text: str | None = None, html: str | None = None) -> str 
     if text:
         links.extend(_URL_PATTERN.findall(text))
 
-    return _pick_preferred_link(links)
+    return _pick_verification_link(links)

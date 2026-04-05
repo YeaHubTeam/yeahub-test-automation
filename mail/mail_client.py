@@ -1,6 +1,9 @@
+from datetime import datetime, timezone
+
 from imap_tools import MailBox
 
-from mail.parsers import extract_first_link
+from mail.models import MailMessage
+from mail.parsers import extract_verification_link
 
 
 class MailClient:
@@ -18,25 +21,16 @@ class MailClient:
         self.folder = folder
         self.port = port
 
-    def get_messages(self) -> list[dict]:
+    def get_messages(self) -> list[MailMessage]:
         messages = []
 
         with MailBox(self.host, port=self.port).login(
             self.email,
             self.password,
             self.folder,
-        ) as mailbox:
+            ) as mailbox:
             for msg in mailbox.fetch():
-                messages.append(
-                    {
-                        "uid": msg.uid,
-                        "subject": msg.subject,
-                        "sender": msg.from_,
-                        "date": msg.date,
-                        "body": msg.text or msg.html,
-                        "html": msg.html,
-                    }
-                )
+                messages.append(MailMessage.from_imap_message(msg))
 
         return messages
 
@@ -44,13 +38,13 @@ class MailClient:
         self,
         subject: str | None = None,
         body_pattern: str | None = None,
-    ):
+    ) -> MailMessage | None:
         messages = self.get_messages()
-        matched_messages = []
+        matched_messages: list[MailMessage] = []
 
         for message in messages:
-            subject_matches = subject is None or subject in (message["subject"] or "")
-            body_matches = body_pattern is None or body_pattern in (message["body"] or "")
+            subject_matches = subject is None or subject in (message.subject or "")
+            body_matches = body_pattern is None or body_pattern in (message.body or "")
 
             if subject_matches and body_matches:
                 matched_messages.append(message)
@@ -58,12 +52,15 @@ class MailClient:
         if not matched_messages:
             return None
 
-        return max(matched_messages, key=lambda message: message["date"])
+        return max(
+            matched_messages,
+            key=lambda message: message.date or datetime.min.replace(tzinfo=timezone.utc),
+        )
 
-    def get_message_link(self, message: dict) -> str | None:
-        return extract_first_link(
-            text=message.get("body"),
-            html=message.get("html"),
+    def get_message_link(self, message: MailMessage) -> str | None:
+        return extract_verification_link(
+            text=message.body,
+            html=message.html,
         )
 
     def get_registration_link(
