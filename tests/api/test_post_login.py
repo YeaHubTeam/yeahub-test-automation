@@ -1,7 +1,8 @@
-from api.api_manager import ApiManager
 import pytest
 import allure
 
+from api.api_manager import ApiManager
+from models.user_response_model import CreatedUserResponse
 
 @allure.epic("Тест - Логин пользователя")
 @pytest.mark.api
@@ -19,8 +20,8 @@ class TestLoginYeahub:
                 "username": test_user["email"],
                 "password": test_user["password"],
             }
-            response = api_manager.auth_api.login_user(login_data)
-            response_data = response.json()
+            response = api_manager.auth_api.login_user(login_data).json()
+            response_data = CreatedUserResponse(**response)
             token = response_data.get("access_token")
 
         with allure.step("Проверяем что токен присутствует в ответе"):

@@ -18,26 +18,18 @@ def api_manager(session):
 
 @pytest.fixture
 def test_user():
-    email = DataGenerator.random_email()
-    username = DataGenerator.random_username()
-    password = DataGenerator.random_password()
-    phone =  DataGenerator.random_phone()
-    country=DataGenerator.random_country()
-    city = DataGenerator.random_city()
-    birthday = DataGenerator.random_birthday()
-    address = DataGenerator.random_address()
-    avatar_url= DataGenerator.random_avatar_url()
     return {
-        "username": username,
-        "password": password,
-        "email": email,
-        "phone": phone,
-        "country": country,
-        "city": city,
-        "birthday": birthday,
-        "address": address,
-        "avatarUrl": avatar_url,
+        "username": DataGenerator.random_username(),
+        "password": DataGenerator.random_password(),
+        "email": DataGenerator.random_email(),
+        "phone": DataGenerator.random_phone(),
+        "country": DataGenerator.random_country(),
+        "city": DataGenerator.random_city(),
+        "birthday": DataGenerator.random_birthday(),
+        "address": DataGenerator.random_address(),
+        "avatarUrl": DataGenerator.random_avatar_url(),
     }
+
 
 
 @pytest.fixture
