@@ -37,22 +37,20 @@ class MailClient:
 
     def find_message(
         self,
-        subject: str | None = None,
-        body_pattern: str | None = None,
+        subject: str,
     ) -> MailMessage:
         messages = self.get_messages()
         matched_messages: list[MailMessage] = []
 
         for message in messages:
-            subject_matches = subject is None or subject in (message.subject or "")
-            body_matches = body_pattern is None or body_pattern in (message.body or "")
+            subject_matches = subject in (message.subject or "")
 
-            if subject_matches and body_matches:
+            if subject_matches:
                 matched_messages.append(message)
 
         if not matched_messages:
             raise MessageNotFoundError(
-                "No email message matched the provided subject/body filters."
+                "No email message matched the provided subject filter."
             )
 
         return max(

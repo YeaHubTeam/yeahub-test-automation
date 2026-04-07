@@ -85,33 +85,6 @@ def test_find_message_raises_when_no_match(monkeypatch):
         client.find_message(subject="Verify Your Email")
 
 
-def test_find_message_raises_when_body_does_not_match(monkeypatch):
-    messages = [
-        MailMessage(
-            uid="1",
-            subject="Fw: Verify Your Email",
-            sender="yeahub@yeahub.ru",
-            date=datetime(2026, 4, 5, 11, 54, 19, tzinfo=timezone.utc),
-            body="This email does not contain the expected text",
-            html=None,
-        )
-    ]
-
-    monkeypatch.setattr(MailClient, "get_messages", lambda self: messages)
-
-    client = MailClient(
-        host="imap.example.com",
-        email="user@example.com",
-        password="password",
-    )
-
-    with pytest.raises(MessageNotFoundError):
-        client.find_message(
-            subject="Verify Your Email",
-            body_pattern="please confirm",
-        )
-
-
 class FakeMailbox:
     def __init__(self) -> None:
         self.login_args = None
@@ -151,6 +124,30 @@ def test_delete_message_calls_delete_and_expunge(monkeypatch):
     assert fake_mailbox.login_args == ("user@example.com", "password", "INBOX")
     assert fake_mailbox.deleted_uids == ["123"]
     assert fake_mailbox.expunge_called is True
+
+
+def test_get_message_link_returns_verification_link():
+    message = MailMessage(
+        uid="5",
+        subject="Fw: Verify Your Email",
+        sender="okvuaary9932338@outlook.com",
+        date=None,
+        body="Скачайте Outlook для iOS<https://aka.ms/o0ukef>",
+        html="""
+        <a href="https://aka.ms/o0ukef">Outlook for iOS</a>
+        <a href="https://api.yeatwork.ru/auth/verify-email?token=123">Подтвердить Email</a>
+        """,
+    )
+
+    client = MailClient(
+        host="imap.example.com",
+        email="user@example.com",
+        password="password",
+    )
+
+    link = client.get_message_link(message)
+
+    assert link == "https://api.yeatwork.ru/auth/verify-email?token=123"
 
 
 def test_get_message_link_raises_when_verification_link_is_missing():
