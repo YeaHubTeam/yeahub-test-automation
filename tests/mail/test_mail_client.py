@@ -2,11 +2,12 @@ from datetime import datetime, timezone
 
 import pytest
 
+from mail.exceptions import MessageNotFoundError, VerificationLinkNotFoundError
 from mail.mail_client import MailClient
 from mail.models import MailMessage
 
 
-pytestmark = [pytest.mark.api, pytest.mark.regression]
+pytestmark = [pytest.mark.unit, pytest.mark.regression]
 
 
 def test_find_message_returns_newest_matching_message(monkeypatch):
@@ -52,7 +53,7 @@ def test_find_message_returns_newest_matching_message(monkeypatch):
     assert message.subject == "Verify Your Email"
 
 
-def test_find_message_returns_none_when_no_match(monkeypatch):
+def test_find_message_raises_when_no_match(monkeypatch):
     messages = [
         MailMessage(
             uid="1",
@@ -80,12 +81,11 @@ def test_find_message_returns_none_when_no_match(monkeypatch):
         password="password",
     )
 
-    message = client.find_message(subject="Verify Your Email")
+    with pytest.raises(MessageNotFoundError):
+        client.find_message(subject="Verify Your Email")
 
-    assert message is None
 
-
-def test_find_message_returns_none_when_body_does_not_match(monkeypatch):
+def test_find_message_raises_when_body_does_not_match(monkeypatch):
     messages = [
         MailMessage(
             uid="1",
@@ -105,12 +105,11 @@ def test_find_message_returns_none_when_body_does_not_match(monkeypatch):
         password="password",
     )
 
-    message = client.find_message(
-        subject="Verify Your Email",
-        body_pattern="please confirm",
-    )
-
-    assert message is None
+    with pytest.raises(MessageNotFoundError):
+        client.find_message(
+            subject="Verify Your Email",
+            body_pattern="please confirm",
+        )
 
 
 class FakeMailbox:
@@ -152,3 +151,23 @@ def test_delete_message_calls_delete_and_expunge(monkeypatch):
     assert fake_mailbox.login_args == ("user@example.com", "password", "INBOX")
     assert fake_mailbox.deleted_uids == ["123"]
     assert fake_mailbox.expunge_called is True
+
+
+def test_get_message_link_raises_when_verification_link_is_missing():
+    message = MailMessage(
+        uid="5",
+        subject="Fw: Verify Your Email",
+        sender="okvuaary9932338@outlook.com",
+        date=None,
+        body="Just a plain text message without a verification URL",
+        html="<html><body>No verification link here</body></html>",
+    )
+
+    client = MailClient(
+        host="imap.example.com",
+        email="user@example.com",
+        password="password",
+    )
+
+    with pytest.raises(VerificationLinkNotFoundError):
+        client.get_message_link(message)

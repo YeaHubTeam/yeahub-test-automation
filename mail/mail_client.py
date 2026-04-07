@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 
 from imap_tools import MailBox
 
+from mail.exceptions import MessageNotFoundError, VerificationLinkNotFoundError
 from mail.models import MailMessage
 from mail.parsers import extract_verification_link
 
@@ -38,7 +39,7 @@ class MailClient:
         self,
         subject: str | None = None,
         body_pattern: str | None = None,
-    ) -> MailMessage | None:
+    ) -> MailMessage:
         messages = self.get_messages()
         matched_messages: list[MailMessage] = []
 
@@ -50,7 +51,9 @@ class MailClient:
                 matched_messages.append(message)
 
         if not matched_messages:
-            return None
+            raise MessageNotFoundError(
+                "No email message matched the provided subject/body filters."
+            )
 
         return max(
             matched_messages,
@@ -59,23 +62,18 @@ class MailClient:
             ),
         )
 
-    def get_message_link(self, message: MailMessage) -> str | None:
-        return extract_verification_link(
+    def get_message_link(self, message: MailMessage) -> str:
+        verification_link = extract_verification_link(
             text=message.body,
             html=message.html,
         )
 
-    def get_registration_link(
-        self,
-        subject: str | None = None,
-        body_pattern: str | None = None,
-    ) -> str | None:
-        message = self.find_message(subject=subject, body_pattern=body_pattern)
+        if verification_link is None:
+            raise VerificationLinkNotFoundError(
+                "Verification link was not found in the email message."
+            )
 
-        if not message:
-            return None
-
-        return self.get_message_link(message)
+        return verification_link
 
     def delete_message(self, uid: str) -> None:
         with MailBox(self.host, port=self.port).login(

@@ -3,6 +3,7 @@ from html.parser import HTMLParser
 
 
 _URL_PATTERN = re.compile(r"https?://[^\s\"'<>]+")
+_VERIFICATION_LINK_FRAGMENT = "verify-email"
 
 
 class _HrefCollector(HTMLParser):
@@ -22,7 +23,7 @@ class _HrefCollector(HTMLParser):
 
 def _pick_verification_link(links: list[str]) -> str | None:
     for link in links:
-        if "verify-email" in link:
+        if _VERIFICATION_LINK_FRAGMENT in link:
             return link
 
     return None

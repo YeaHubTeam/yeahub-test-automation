@@ -3,7 +3,7 @@ import pytest
 from mail.parsers import extract_verification_link
 
 
-pytestmark = [pytest.mark.api, pytest.mark.regression]
+pytestmark = [pytest.mark.unit, pytest.mark.regression]
 
 
 def test_extract_verification_link_prefers_verification_link():

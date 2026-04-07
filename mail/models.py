@@ -23,6 +23,6 @@ class MailMessage(BaseModel):
             subject=message.subject,
             sender=message.from_,
             date=message.date,
-            body=message.text or message.html,
+            body=message.text,
             html=message.html,
         )
