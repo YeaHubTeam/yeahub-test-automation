@@ -16,15 +16,18 @@ class BaseResponse(BaseModel):
     # --- dict-like интерфейс ---
 
     def __getitem__(self, key):
-        """data["field"]"""
-        return getattr(self, key)
+        """data["field"] - получение значения по ключу"""
+        try:
+            return getattr(self, key)
+        except AttributeError:
+            raise KeyError(f"Key '{key}' not found")
 
     def __setitem__(self, key, value):
-        """data["field"] = value"""
+        """data["field"] = value - установка значения по ключу"""
         setattr(self, key, value)
 
     def __contains__(self, key):
-        """'id' in data"""
+        """'id' in data - проверка существования ключа (как в словаре)"""
         return hasattr(self, key) and getattr(self, key) is not None
 
     def get(self, key, default=None):
@@ -41,9 +44,6 @@ class BaseResponse(BaseModel):
         return self.model_dump().items()
 
     def to_dict(self):
-        """Явное преобразование"""
+        """Явное преобразование в словарь """
         return self.model_dump()
 
-    def __iter__(self):
-        """Позволяет делать dict(model)"""
-        return iter(self.model_dump().items())

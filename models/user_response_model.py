@@ -1,4 +1,4 @@
-from pydantic import field_validator,Field, ConfigDict, HttpUrl
+from pydantic import field_validator,Field, ConfigDict, HttpUrl, EmailStr
 from typing import Optional, List
 from models.base_model import BaseResponse
 import datetime
@@ -8,7 +8,7 @@ class TestUser(BaseResponse):
     """Модель валидации исходящих данных случайного пользователя"""
     username: str
     password: str
-    email: str
+    email: EmailStr
     phone: str
     country: str
     city: str
@@ -16,13 +16,6 @@ class TestUser(BaseResponse):
     address: str
     avatarUrl: HttpUrl
     refId: Optional[str] = None
-
-    @field_validator("email")
-    def check_email(cls, value: str, info) -> str:
-        # Проверяем, совпадение паролей
-        if "password" in info.data and value != info.data["password"]:
-            raise ValueError("Пароли не совпадают")
-        return value
 
 
 class Permission(BaseResponse):
@@ -53,11 +46,11 @@ class UserResponse(BaseResponse):
     phone: str
     country: str
     city: str
-    email:str
+    email:EmailStr
     birthday: datetime.date
     address: str
     avatarUrl: str
-    telegramUsername: Optional[bool] = None
+    telegramUsername: Optional[str] = None
     createdAt: datetime.datetime = Field(alias='createdAt')
     updatedAt: datetime.datetime = Field(alias='updatedAt')
     userRoles: Optional[List[UserRole]] = None
@@ -66,13 +59,6 @@ class UserResponse(BaseResponse):
     profiles: List[Profiles]
     subscriptions: Optional[list] = None
 
-
-    model_config = ConfigDict(
-        extra='forbid',
-        populate_by_name=True,
-        from_attributes=True,
-        strict=False
-    )
 
 class CreatedUserResponse(BaseResponse):
     access_token: str

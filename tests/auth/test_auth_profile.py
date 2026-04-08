@@ -17,7 +17,7 @@ class TestProfileYeahub:
             response_data = UserResponse(**response)
 
         with allure.step('Проверяем, что зареганный пользователь пришел в ответе с профиля'):
-            if "user" in response:
-                assert response["user"]["username"] == logged_in_user["username"]
+            if "user" in response_data:
+                assert response_data["user"]["username"] == logged_in_user["username"]
             else:
-                assert response.get("username") == logged_in_user["username"]
+                assert response_data.get("username") == logged_in_user["username"]
