@@ -1,4 +1,5 @@
 from api.api_manager import ApiManager
+from models.user_response_model import Profiles, UserResponse
 import allure
 import pytest
 
@@ -12,8 +13,8 @@ class TestProfileYeahub:
     @allure.title('Тестирование получения профиля аутентифицированного пользователя')
     def test_auth_user_profile(self, api_manager: ApiManager, logged_in_user):
         with allure.step('Оправляем PATCH запрос с данными нового пароля пользователя'):
-            response = api_manager.auth_api.profile(logged_in_user)
-            response_data = response.json()
+            response = api_manager.auth_api.profile(logged_in_user).json()
+            response_data = UserResponse(**response)
 
         with allure.step('Проверяем, что зареганный пользователь пришел в ответе с профиля'):
             if "user" in response_data:
