@@ -1,6 +1,5 @@
-from typing import Any, Optional, List
 from custom_requester.custom_requester import CustomRequester
-from constants import BASE_URL
+from constants.constants import BASE_URL
 
 
 class AuthAPI(CustomRequester):
