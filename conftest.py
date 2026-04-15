@@ -1,5 +1,6 @@
 import pytest
 import requests
+
 from api.api_manager import ApiManager
 from utils.data_generator import DataGenerator
 
@@ -31,7 +32,6 @@ def test_user():
     }
 
 
-
 @pytest.fixture
 def registered_user(api_manager, test_user):
     response = api_manager.auth_api.register_user(test_user, expected_status=201)
@@ -54,8 +54,6 @@ def logged_in_user(api_manager, registered_user):
         "password": registered_user["password"],
     }
     api_manager.auth_api.login_user(login_data)
-    api_manager.auth_api.authenticate(
-        (registered_user["email"], registered_user["password"])
-    )
+    api_manager.auth_api.authenticate((registered_user["email"], registered_user["password"]))
 
     return registered_user

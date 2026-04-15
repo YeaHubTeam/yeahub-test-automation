@@ -1,5 +1,6 @@
 import random
 import string
+
 from faker import Faker
 
 faker = Faker()
@@ -56,5 +57,3 @@ class DataGenerator:
     @staticmethod
     def random_avatar_url():
         return faker.image_url()
-
-

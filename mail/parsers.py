@@ -1,7 +1,6 @@
 import re
 from html.parser import HTMLParser
 
-
 _URL_PATTERN = re.compile(r"https?://[^\s\"'<>]+")
 _VERIFICATION_LINK_FRAGMENT = "verify-email"
 

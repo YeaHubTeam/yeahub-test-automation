@@ -6,11 +6,9 @@ class BaseResponse(BaseModel):
     Базовая модель ответа API, к которому можно обращаться как с dict и как модель.
 
     """
+
     model_config = ConfigDict(
-        extra="forbid",
-        populate_by_name=True,
-        from_attributes=True,
-        strict=False
+        extra="forbid", populate_by_name=True, from_attributes=True, strict=False
     )
 
     # --- dict-like интерфейс ---
@@ -44,6 +42,5 @@ class BaseResponse(BaseModel):
         return self.model_dump().items()
 
     def to_dict(self):
-        """Явное преобразование в словарь """
+        """Явное преобразование в словарь"""
         return self.model_dump()
-

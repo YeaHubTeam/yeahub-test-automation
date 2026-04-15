@@ -6,7 +6,6 @@ from mail.exceptions import MessageNotFoundError, VerificationLinkNotFoundError
 from mail.mail_client import MailClient
 from mail.models import MailMessage
 
-
 pytestmark = [pytest.mark.unit, pytest.mark.regression]
 
 
