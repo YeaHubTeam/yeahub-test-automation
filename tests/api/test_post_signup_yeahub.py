@@ -1,7 +1,8 @@
+import allure
+import pytest
+
 from api.api_manager import ApiManager
 from models.user_response_model import CreatedUserResponse
-import pytest
-import allure
 
 
 @allure.epic("Тест - Регистрация пользователя")

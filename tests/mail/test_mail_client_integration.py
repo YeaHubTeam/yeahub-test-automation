@@ -6,7 +6,6 @@ import pytest
 from mail.mail_client import MailClient
 from resources.mail_creds import MailCreds
 
-
 pytestmark = [
     pytest.mark.api,
     pytest.mark.regression,

@@ -1,0 +1,66 @@
+[project]
+name = "yeahub-test-automation"
+version = "0.1.0"
+description = "Automated API tests for YeaHub service"
+readme = "README.md"
+requires-python = ">=3.14,<3.15"
+dependencies = [
+    "requests==2.32.5",
+    "python-dotenv==1.2.1",
+    "pydantic==2.12.5",
+    "email-validator",
+    "faker==40.1.2",
+    "imap-tools==1.11.1",
+]
+
+[dependency-groups]
+dev = [
+    "pytest==9.0.2",
+    "ruff==0.11.8",
+    "allure-pytest==2.15.3",
+    "pre-commit==4.5.1",
+]
+
+[tool.pytest.ini_options]
+log_cli = true
+log_format = "%(asctime)s %(levelname)s %(message)s"
+log_date_format = "%Y-%m-%d %H:%M:%S"
+log_cli_level = "INFO"
+log_cli_format = "%(asctime)s %(levelname)s %(message)s"
+log_cli_date_format = "%Y-%m-%d %H:%M:%S"
+markers = [
+    "smoke: Смок тесты",
+    "critical: Критичные тесты",
+    "regression: Регрессионные тесты",
+    "slow: Медленные тесты",
+    "negative: Негативные тесты",
+    "unit: Unit-тесты",
+    "api: API-тесты",
+    "ui: UI-тесты",
+    "db: DB-тесты",
+    "healthcheck: Cтатусы сервисов",
+    "integration: Интеграционные тесты",
+]
+
+[tool.ruff]
+target-version = "py314"
+line-length = 100
+indent-width = 4
+exclude = [
+    ".venv",
+    "__pycache__",
+    "build",
+    "dist",
+    ".ruff_cache",
+    ".mypy_cache",
+]
+
+[tool.ruff.lint]
+select = ["E", "W", "I"]
+ignore = ["E501"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"
+skip-magic-trailing-comma = false

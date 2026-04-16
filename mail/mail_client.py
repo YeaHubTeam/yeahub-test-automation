@@ -49,15 +49,11 @@ class MailClient:
                 matched_messages.append(message)
 
         if not matched_messages:
-            raise MessageNotFoundError(
-                "No email message matched the provided subject filter."
-            )
+            raise MessageNotFoundError("No email message matched the provided subject filter.")
 
         return max(
             matched_messages,
-            key=lambda message: (
-                message.date or datetime.min.replace(tzinfo=timezone.utc)
-            ),
+            key=lambda message: message.date or datetime.min.replace(tzinfo=timezone.utc),
         )
 
     def get_message_link(self, message: MailMessage) -> str:

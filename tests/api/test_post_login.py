@@ -1,8 +1,9 @@
-import pytest
 import allure
+import pytest
 
 from api.api_manager import ApiManager
 from models.user_response_model import CreatedUserResponse
+
 
 @allure.epic("Тест - Логин пользователя")
 @pytest.mark.api
@@ -33,8 +34,6 @@ class TestLoginYeahub:
         with allure.step("Проверяем что данные пользователя присутствуют в ответе"):
             assert "user" in response_data, "Данные пользователя отсутствуют в ответе"
             if "email" in response_data["user"]:
-                assert response_data["user"]["email"] == test_user["email"], (
-                    "Email не совпадает"
-                )
+                assert response_data["user"]["email"] == test_user["email"], "Email не совпадает"
             assert "id" in response_data["user"], "ID пользователя отсутствует"
             assert "userRoles" in response_data["user"], "Роли пользователя отсутствуют"

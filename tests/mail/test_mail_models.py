@@ -4,7 +4,6 @@ import pytest
 
 from mail.models import MailMessage
 
-
 pytestmark = [pytest.mark.unit, pytest.mark.regression]
 
 

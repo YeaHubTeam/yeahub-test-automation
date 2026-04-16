@@ -87,7 +87,9 @@ class CustomRequester:
             headers = " \\\n".join(
                 [f"-H '{header}: {value}'" for header, value in request.headers.items()]
             )
-            full_test_name = f"pytest {os.environ.get('PYTEST_CURRENT_TEST', '').replace(' (call)', '')}"
+            full_test_name = (
+                f"pytest {os.environ.get('PYTEST_CURRENT_TEST', '').replace(' (call)', '')}"
+            )
 
             body = ""
             if hasattr(request, "body") and request.body is not None:
@@ -111,9 +113,7 @@ class CustomRequester:
 
             # Попытка форматировать JSON
             try:
-                response_data = json.dumps(
-                    json.loads(response.text), indent=4, ensure_ascii=False
-                )
+                response_data = json.dumps(json.loads(response.text), indent=4, ensure_ascii=False)
             except json.JSONDecodeError:
                 pass  # Оставляем текст, если это не JSON
 
@@ -126,8 +126,7 @@ class CustomRequester:
                 )
             else:
                 self.logger.info(
-                    f"\tSTATUS_CODE: {GREEN}{response_status}{RESET}\n"
-                    f"\tDATA:\n{response_data}"
+                    f"\tSTATUS_CODE: {GREEN}{response_status}{RESET}\n\tDATA:\n{response_data}"
                 )
             self.logger.info(f"{'=' * 80}\n")
         except Exception as e:
