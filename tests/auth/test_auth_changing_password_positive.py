@@ -1,7 +1,7 @@
 import pytest
 
-from utils.data_generator import DataGenerator
 from payloads.auth_payloads import AuthPayloads
+from utils.data_generator import DataGenerator
 
 
 class TestPasswordPositive:

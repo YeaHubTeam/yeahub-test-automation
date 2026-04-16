@@ -1,11 +1,8 @@
 import pytest
 import requests
+
 from api.api_manager import ApiManager
 from utils.data_generator import DataGenerator
-from utils.helpers import DataUtils
-from models.Subscriptions.model_subscription import ModelSubscriptionResponse
-from models.auth_model import AuthModel
-from resources.user_creds import VerifiedUserCreds
 
 
 @pytest.fixture(scope="session")
@@ -59,9 +56,6 @@ def logged_in_user(api_manager, registered_user):
         "password": registered_user["password"],
     }
     api_manager.auth_api.login_user(login_data)
-    api_manager.auth_api.authenticate(
-        (registered_user["email"], registered_user["password"])
-    )
+    api_manager.auth_api.authenticate((registered_user["email"], registered_user["password"]))
 
     return registered_user
-

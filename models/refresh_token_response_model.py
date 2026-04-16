@@ -1,11 +1,13 @@
-from typing import Optional, List
-from models.base_model import BaseResponse
 import datetime
+from typing import List, Optional
+
+from models.base_model import BaseResponse
 
 
 class Permission(BaseResponse):
     id: int
     name: str
+
 
 class UserRole(BaseResponse):
     id: int
@@ -30,6 +32,7 @@ class BaseRefreshTokenResponse(BaseResponse):
     isVerified: bool
     isEmailNotificationsEnable: bool
 
+
 class RefreshTokenResponse(BaseResponse):
     access_token: str
-    user:BaseRefreshTokenResponse
+    user: BaseRefreshTokenResponse

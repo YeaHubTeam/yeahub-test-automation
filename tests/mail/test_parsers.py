@@ -2,7 +2,6 @@ import pytest
 
 from mail.parsers import extract_verification_link
 
-
 pytestmark = [pytest.mark.unit, pytest.mark.regression]
 
 

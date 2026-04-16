@@ -1,8 +1,8 @@
 import pytest
-
-from utils.data_generator import DataGenerator
-from payloads.auth_payloads import AuthPayloads
 from faker import Faker
+
+from payloads.auth_payloads import AuthPayloads
+from utils.data_generator import DataGenerator
 
 faker = Faker()
 
@@ -45,9 +45,7 @@ class TestPasswordNegative:
         )
 
     @pytest.mark.api
-    def test_login_old_password_after_change(
-        self, logged_in_user, api_manager
-    ):
+    def test_login_old_password_after_change(self, logged_in_user, api_manager):
         """Смена пароля и логин под старым паролем"""
         payload = AuthPayloads.payload_password()
         response = api_manager.auth_api.password_change(logged_in_user["id"], payload)
@@ -58,10 +56,7 @@ class TestPasswordNegative:
             "username": logged_in_user["email"],
             "password": logged_in_user["password"],
         }
-        response_login = api_manager.auth_api.login_user(
-            login_data, expected_status=401
-        )
+        response_login = api_manager.auth_api.login_user(login_data, expected_status=401)
         assert (
-            response_login.json().get("description")
-            == "user with this email has another password"
+            response_login.json().get("description") == "user with this email has another password"
         ), "Сообщения не совпадают"

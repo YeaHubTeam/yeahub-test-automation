@@ -1,5 +1,6 @@
 from custom_requester.custom_requester import CustomRequester
 from constants.constants import BASE_URL
+from typing import Any, List, Optional
 
 
 class AuthAPI(CustomRequester):
@@ -56,29 +57,21 @@ class AuthAPI(CustomRequester):
         """
         Выход пользователя из системы.
         """
-        return self.send_request(
-            method="GET",
-            endpoint="auth/logout",
-            expected_status=200
-        )
+        return self.send_request(method="GET", endpoint="auth/logout", expected_status=200)
 
     def profile(self, *args, **kwargs):
         """
         Получение профиля аутентифицированного пользователя.
         """
-        return self.send_request(
-            method="GET", endpoint="auth/profile", expected_status=200
-        )
+        return self.send_request(method="GET", endpoint="auth/profile", expected_status=200)
 
     def refresh_auth_token(self, *args, **kwargs):
         """
         Refresh access token.
         """
-        return self.send_request(
-            method="GET", endpoint="auth/refresh", expected_status=200
-        )
+        return self.send_request(method="GET", endpoint="auth/refresh", expected_status=200)
 
-    #TODO #Нужно отрефачить позже. Жду таск - https://tracker.yandex.ru/YH-1756
+    # TODO #Нужно отрефачить позже. Жду таск - https://tracker.yandex.ru/YH-1756
     def verify_sent_email(self, *args, **kwargs):
         """
         Верификация email пользователя.
@@ -93,20 +86,17 @@ class AuthAPI(CustomRequester):
             expected_status=expected_status,
         )
 
-
-    #TODO - Не доделано! Не использовать пока. Жду таск - https://tracker.yandex.ru/YH-1756
+    # TODO - Не доделано! Не использовать пока. Жду таск - https://tracker.yandex.ru/YH-1756
     def verify_sent_email(self, token, expected_status=200):
-        '''
+        """
         Верификация email пользователя.
-        '''
+        """
         return self.send_request(
             method="GET",
             endpoint="auth/verify-email",
             params=token,
             expected_status=expected_status,
         )
-
-
 
     def send_verification_email(self, user_data=None, expected_status=200):
         """
@@ -131,7 +121,7 @@ class AuthAPI(CustomRequester):
             expected_status=expected_status,
         )
 
-    #TODO #Dummy. Требует доработки! Не корректная реализация. - Жду таск - https://tracker.yandex.ru/YH-1756
+    # TODO #Dummy. Требует доработки! Не корректная реализация. - Жду таск - https://tracker.yandex.ru/YH-1756
     def reset_password(self, user_data=None, expected_status=200):
         """
         Сброс пароля пользователя.
@@ -157,11 +147,7 @@ class AuthAPI(CustomRequester):
         """
         Отправка письма для сброса пароля пользователя.
         """
-        email = (
-            user_data.get("email", "<email>")
-            if isinstance(user_data, dict)
-            else "<email>"
-        )
+        email = user_data.get("email", "<email>") if isinstance(user_data, dict) else "<email>"
 
         return self.send_request(
             method="GET",
