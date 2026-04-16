@@ -60,7 +60,7 @@ class TestSubscriptionPositive:
     def test_payment_details(self, payment_link_subscriptions, static_user):
         with allure.step("Берем финальную цену подписки из документации в копейках"):
             price_tarif = DataUtils.find_item(
-                items=TarifList.base_tarif().items,
+                items=TarifList.base_tarif().tarifs,
                 condition= lambda tarif: tarif.name == NAME_SUBSCRIPTIONS,
                 transform= lambda tarif: int(tarif.finalPrice)* 100
             )

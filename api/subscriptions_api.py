@@ -6,7 +6,7 @@ class SubscriptionsAPI(CustomRequester):
     Класс для работы с подпиской
     """
     SUBSCRIPTIONS = "subscriptions"
-    SUBSCRIPTIONS_TRAIL = "subscriptions/trail"
+    SUBSCRIPTIONS_TRAIL = "subscriptions/trial"
     SUBSCRIPTIONS_USER = "subscriptions/users/"
     PAYMENT_INIT = "/payment/init"
 
