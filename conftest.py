@@ -34,6 +34,7 @@ def test_user():
 
 @pytest.fixture
 def registered_user(api_manager, test_user):
+    """Регистрация пользователя и удаление его после теста"""
     response = api_manager.auth_api.register_user(test_user, expected_status=201)
     test_user["id"] = response.json().get("user", {}).get("id")
     test_user["token"] = response.json().get("access_token")
@@ -49,6 +50,7 @@ def registered_user(api_manager, test_user):
 
 @pytest.fixture
 def logged_in_user(api_manager, registered_user):
+    """Авторизация пользователя"""
     login_data = {
         "username": registered_user["email"],
         "password": registered_user["password"],
