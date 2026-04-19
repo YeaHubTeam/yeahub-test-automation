@@ -70,3 +70,49 @@ class UserResponse(BaseResponse):
 class CreatedUserResponse(BaseResponse):
     access_token: str
     user: UserResponse
+
+
+class LoginUserResponse(BaseResponse):
+    id: str
+    username: str
+    email: EmailStr
+    phone: str
+    updatedAt: datetime.datetime
+    createdAt: datetime.datetime
+    userRoles: List[UserRole]
+    isVerified: bool
+    isEmailNotificationsEnable: bool
+
+    country: Optional[str] = None
+    city: Optional[str] = None
+    birthday: Optional[datetime.datetime] = None
+    address: Optional[str] = None
+    avatarUrl: Optional[str] = None
+    telegramUsername: Optional[str] = None
+
+
+class LoginResponse(BaseResponse):
+    access_token: str
+    user: LoginUserResponse
+
+
+class SignUpUserResponse(BaseResponse):
+    id: str
+    username: str
+    email: EmailStr
+    phone: str
+    updatedAt: datetime.datetime
+    createdAt: datetime.datetime
+    isEmailNotificationsEnable: bool
+
+    country: Optional[str] = None
+    city: Optional[str] = None
+    birthday: Optional[datetime.datetime] = None
+    address: Optional[str] = None
+    avatarUrl: Optional[str] = None
+    telegramUsername: Optional[str] = None
+
+
+class SignUpResponse(BaseResponse):
+    access_token: str
+    user: SignUpUserResponse
