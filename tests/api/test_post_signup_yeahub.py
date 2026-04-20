@@ -2,7 +2,7 @@ import allure
 import pytest
 
 from api.api_manager import ApiManager
-from models.user_response_model import CreatedUserResponse
+from models.user_response_model import SignUpResponse
 
 
 @allure.epic("Тест - Регистрация пользователя")
@@ -13,22 +13,27 @@ class TestSignUpYeahub:
     @allure.label("AQA_Engineer", "Dilovar Odinaev")
     @allure.title("Тестирование регистрации пользователя")
     def test_signup_user(self, api_manager: ApiManager, test_user):
-        with allure.step("Оправляем POST запрос с данными тестового пользователя"):
+        with allure.step("Отправляем POST-запрос с данными тестового пользователя"):
             response = api_manager.auth_api.register_user(test_user).json()
-            response_model = CreatedUserResponse(**response)
+            response_data = SignUpResponse.model_validate(response)
+            token = response_data.access_token
 
         with allure.step("Проверяем наличие токена в ответе"):
-            assert "access_token" in response_model, "Access token missing"
+            assert token, "Токен доступа отсутствует в ответе"
 
         with allure.step("Проверяем наличие юзера в ответе"):
-            assert "user" in response_model, "User data missing"
+            assert response_data.user is not None, "Данные пользователя отсутствуют в ответе"
 
         with allure.step(
             "Проверяем что имя юзера в ответе совпадает с именем сгенерированного юзера"
         ):
-            assert response_model["user"]["username"] == test_user["username"]
+            assert response_data.user.username == test_user["username"], (
+                "username в ответе не совпадает с сгенерированным пользователем"
+            )
 
         with allure.step(
             "Проверяем что 'Email' юзера в ответе совпадает с 'Email' сгенерированного юзера"
         ):
-            assert response_model["user"]["email"] == test_user["email"]
+            assert response_data.user.email == test_user["email"], (
+                "email в ответе не совпадает с сгенерированным пользователем"
+            )

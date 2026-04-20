@@ -2,7 +2,7 @@ import allure
 import pytest
 
 from api.api_manager import ApiManager
-from models.user_response_model import CreatedUserResponse
+from models.user_response_model import LoginResponse
 
 
 @allure.epic("Тест - Логин пользователя")
@@ -13,8 +13,8 @@ class TestLoginYeahub:
     @allure.label("AQA_Engineer", "Dilovar Odinaev")
     @allure.title("Тестирование логирования пользователя")
     def test_logging_user(self, api_manager: ApiManager, test_user):
-        with allure.step("Отправляем Post запрос на создание тестового юзера"):
-            response = api_manager.auth_api.register_user(user_data=test_user)
+        with allure.step("Отправляем POST-запрос на создание тестового пользователя"):
+            api_manager.auth_api.register_user(user_data=test_user)
 
         with allure.step("Логинимся с данными зарегистрированного пользователя"):
             login_data = {
@@ -22,18 +22,14 @@ class TestLoginYeahub:
                 "password": test_user["password"],
             }
             response = api_manager.auth_api.login_user(login_data).json()
-            response_data = CreatedUserResponse(**response)
-            token = response_data.get("access_token")
+            response_data = LoginResponse.model_validate(response)
+            token = response_data.access_token
 
         with allure.step("Проверяем что токен присутствует в ответе"):
             assert token, "Токен доступа отсутствует в ответе"
 
-        with allure.step("Проверяем что токен не пустой"):
-            assert len(token) > 0, "Токен не должен быть пустым"
-
         with allure.step("Проверяем что данные пользователя присутствуют в ответе"):
-            assert "user" in response_data, "Данные пользователя отсутствуют в ответе"
-            if "email" in response_data["user"]:
-                assert response_data["user"]["email"] == test_user["email"], "Email не совпадает"
-            assert "id" in response_data["user"], "ID пользователя отсутствует"
-            assert "userRoles" in response_data["user"], "Роли пользователя отсутствуют"
+            assert response_data.user is not None, "Данные пользователя отсутствуют в ответе"
+            assert response_data.user.email == test_user["email"], "Email не совпадает"
+            assert response_data.user.id, "ID пользователя отсутствует"
+            assert response_data.user.userRoles is not None, "Роли пользователя отсутствуют"
