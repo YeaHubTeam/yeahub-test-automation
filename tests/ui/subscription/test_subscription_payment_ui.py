@@ -14,13 +14,18 @@ class TestSubscriptionPaymentUI:
 
         payment_page.open(payment_link_subscriptions)
         payment_page.assert_payment_form_opened()
-        payment_page.fill_card(CardPayload.VISA)
+        payment_page.fill_card(CardPayload.SUCCESS_CARD)
         payment_page.submit_payment()
         payment_page.assert_payment_success()
 
-    def test_user_cannot_buy_subscription_with_invalid_cvc(self, page, payment_link_subscriptions):
+    @allure.title("Отклонение оплаты подписки decline-картой")
+    def test_user_cannot_buy_subscription_with_declined_card(
+        self, page, payment_link_subscriptions
+    ):
         payment_page = TBankPaymentPage(page)
 
         payment_page.open(payment_link_subscriptions)
         payment_page.assert_payment_form_opened()
-        payment_page.fill_card(CardPayload.INVALID_CVC)
+        payment_page.fill_card(CardPayload.DECLINED_CARD)
+        payment_page.submit_payment()
+        payment_page.assert_payment_declined()
