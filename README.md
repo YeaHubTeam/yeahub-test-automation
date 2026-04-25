@@ -50,7 +50,18 @@ uv sync --python 3.14
 - устанавливает зависимости из `pyproject.toml`
 - использует `uv.lock`, чтобы окружение было воспроизводимым
 
-### 3. Подготовить переменные окружения
+### 3. Установить браузер для Playwright UI-тестов
+
+```bash
+uv run playwright install chromium
+```
+
+Что делает команда:
+- скачивает Chromium для Playwright
+- нужен для запуска UI-тестов локально и в CI
+- без этого UI-тесты с `pytest-playwright` не смогут стартовать
+
+### 4. Подготовить переменные окружения
 
 Создай локальный `.env` на основе `.env.example`.
 
@@ -95,6 +106,12 @@ uv run pytest
 
 ```bash
 uv run pytest tests/api/
+```
+
+### Только UI-тесты
+
+```bash
+uv run pytest tests/ui/
 ```
 
 ### Только mail-тесты
