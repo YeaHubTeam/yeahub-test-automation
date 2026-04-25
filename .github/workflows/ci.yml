@@ -29,6 +29,9 @@ jobs:
       - name: Sync dependencies
         run: uv sync --python 3.14
 
+      - name: Install Playwright Chromium
+        run: uv run playwright install chromium
+
       - name: Ruff check
         run: uv run ruff check .
 

@@ -1,26 +1,27 @@
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass
+
 
 @dataclass(frozen=True)
 class Card:
     """
-    Представляет структуры данных банковской карты
-    Атрибуты:
-        number_card - номер карты
-        expiry_date - срок действия карты
-        cvc - секретный код крты
+    Представляет структуру данных банковской карты.
     """
-    number_card:str
-    expiry_date:str
-    cvc:str
+
+    number_card: str
+    expiry_date: str
+    cvc: str
+
 
 class CardPayload:
     """
-    Набор готовых банковских карт для тестирования
-    Содержит статические обекты класса Card
-    *Если нужно данные преобразовать в JSON, в код нужно импортировать метод **from dataclasses import asdict**
-    """
-    VISA =  Card("4300 0000 0000 0777", "12/30", "111")
-    INVALID_NUMBER_CARD = Card("4300 0000 1234 0777", "12/30", "111")
-    CARD_EXPIRED = Card("4300 0000 1234 0777", "12/25", "111")
-    INVALID_CVC = Card("4300 0000 1234 0777", "12/30", "222")
+    Набор тестовых банковских карт для формы оплаты Т-Банка.
 
+    В текущем sandbox результат оплаты определяется номером карты:
+    - SUCCESS_CARD проходит оплату
+    - ALTERNATIVE_SUCCESS_CARD также проходит оплату и оставлена как запасная
+    - DECLINED_CARD отклоняет оплату
+    """
+
+    SUCCESS_CARD = Card("4300 0000 0000 0777", "12/30", "111")
+    ALTERNATIVE_SUCCESS_CARD = Card("4000 0000 0000 0119", "12/30", "111")
+    DECLINED_CARD = Card("5000 0000 0000 0009", "12/30", "111")
