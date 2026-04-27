@@ -3,6 +3,8 @@ import pytest
 from payloads.auth_payloads import AuthPayloads
 from utils.data_generator import DataGenerator
 
+pytestmark = [pytest.mark.api, pytest.mark.integration, pytest.mark.regression]
+
 
 class TestPasswordPositive:
     @pytest.mark.api

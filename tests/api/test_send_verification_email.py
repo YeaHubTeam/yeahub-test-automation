@@ -5,6 +5,8 @@ from api.api_manager import ApiManager
 
 # TODO - ТЕСТ ТРЕБУЕТ ДОРАБОТКИ! НЕ ГОТОВО!
 
+pytestmark = [pytest.mark.api, pytest.mark.integration, pytest.mark.regression]
+
 
 @allure.epic("Тест - Отправка емейла верификации")
 @pytest.mark.api

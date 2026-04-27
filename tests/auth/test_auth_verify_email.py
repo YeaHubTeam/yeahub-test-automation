@@ -2,6 +2,8 @@ import pytest
 
 from api.api_manager import ApiManager
 
+pytestmark = [pytest.mark.api, pytest.mark.integration, pytest.mark.regression]
+
 
 # TODO - ТЕСТ ТРЕБУЕТ ДОРАБОТКИ! НЕ ГОТОВО! Жду таск - https://tracker.yandex.ru/YH-1756
 @pytest.mark.skip(reason="Нужен мейлер клиент - Ждем таск: https://tracker.yandex.ru/YH-1756")

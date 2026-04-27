@@ -4,6 +4,8 @@ import pytest
 from api.api_manager import ApiManager
 from models.user_response_model import SignUpResponse
 
+pytestmark = [pytest.mark.api, pytest.mark.integration, pytest.mark.regression]
+
 
 @allure.epic("Тест - Регистрация пользователя")
 @pytest.mark.api

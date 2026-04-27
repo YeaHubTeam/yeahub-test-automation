@@ -4,6 +4,8 @@ import pytest
 from api.api_manager import ApiManager
 from payloads.auth_payloads import AuthPayloads
 
+pytestmark = [pytest.mark.api, pytest.mark.integration, pytest.mark.regression]
+
 
 @allure.epic("Тест - Смены пароля")
 @pytest.mark.api

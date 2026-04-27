@@ -4,6 +4,8 @@ import pytest
 from api.api_manager import ApiManager
 from models.user_response_model import Profiles, UserResponse
 
+pytestmark = [pytest.mark.api, pytest.mark.integration, pytest.mark.regression]
+
 
 @allure.epic("Тест - Профиль пользователя")
 @pytest.mark.api

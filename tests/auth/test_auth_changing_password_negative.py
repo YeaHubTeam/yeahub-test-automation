@@ -5,6 +5,7 @@ from payloads.auth_payloads import AuthPayloads
 from utils.data_generator import DataGenerator
 
 faker = Faker()
+pytestmark = [pytest.mark.api, pytest.mark.integration, pytest.mark.regression]
 
 
 class TestPasswordNegative:
