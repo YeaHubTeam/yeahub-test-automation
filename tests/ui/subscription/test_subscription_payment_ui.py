@@ -4,6 +4,8 @@ import pytest
 from pages.payment.tbank_payment_page import TBankPaymentPage
 from payloads.card_payload import CardPayload
 
+pytestmark = [pytest.mark.ui, pytest.mark.integration, pytest.mark.regression]
+
 
 @pytest.mark.ui
 @allure.epic("UI: Покупка подписки")

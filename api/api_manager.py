@@ -1,6 +1,6 @@
 from api.auth_api import AuthAPI
-from api.user_api import UserAPI
 from api.subscriptions_api import SubscriptionsAPI
+from api.user_api import UserAPI
 
 
 class ApiManager:

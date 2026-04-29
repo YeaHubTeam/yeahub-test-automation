@@ -96,80 +96,81 @@ cp .env.example .env
 
 ## Запуск тестов
 
-### Все тесты
+Основные команды:
 
 ```bash
 uv run pytest
-```
-
-### Только API-тесты
-
-```bash
 uv run pytest tests/api/
-```
-
-### Только UI-тесты
-
-```bash
 uv run pytest tests/ui/
-```
-
-### Только mail-тесты
-
-```bash
 uv run pytest tests/mail/
-```
-
-### Конкретный тестовый файл
-
-```bash
 uv run pytest tests/api/test_post_signup_yeahub.py
-```
-
-### С подробным выводом
-
-```bash
 uv run pytest -v
-```
-
-### Запуск по pytest marks
-
-```bash
 uv run pytest -m smoke
 uv run pytest -m "smoke and api"
 uv run pytest -m "critical or regression"
-```
-
-### Проверка только коллекции тестов
-
-```bash
+uv run pytest -m "unit or pr_safe"
+uv run pytest -m "smoke and integration"
+uv run pytest -m "integration"
 uv run pytest --collect-only
 ```
 
-Для чего это нужно:
-- быстро проверить, что тесты импортируются и собираются
-- полезно после изменений в инфраструктуре, зависимостях и конфиге
+`uv run pytest --collect-only` полезен для быстрой проверки импорта и коллекции тестов после изменений в инфраструктуре, зависимостях и конфиге.
+
+## CI Strategy
+
+В проекте используется 2 CI-контура.
+
+`Fast CI` — `.github/workflows/ci.yml`
+- запускается автоматически на `push` и `pull_request`
+- проверяет `ruff check .`, `ruff format . --check`, preflight API healthcheck и `pytest -m "unit or pr_safe"`
+- `Allure` для этого контура не используется, чтобы PR-пайплайн оставался быстрым и простым
+
+`Integration CI` — `.github/workflows/integration.yml`
+- запускается вручную через `Actions -> Integration (Live) -> Run workflow`
+- запускается автоматически ночью по `schedule`
+- `scope=smoke` запускает `pytest -m "smoke and integration"`
+- `scope=full` и nightly запускают `pytest -m "integration"`
+- перед тестами выполняется preflight healthcheck API `https://api.yeatwork.ru/subscriptions`
+- после каждого manual/nightly run сохраняются artifacts `allure-results-<run_number>` и `allure-report-<run_number>`
+
+Artifacts доступны на странице конкретного workflow run в GitHub Actions.
+
+## Markers Guide
+
+Базовые маркеры:
+
+- `unit` - изолированные тесты без зависимости от удаленного стенда
+- `pr_safe` - стабильные тесты, разрешенные для запуска в PR-контуре
+- `api` - HTTP/API сценарии
+- `ui` - браузерные UI сценарии
+- `integration` - тесты, которые зависят от реального внешнего окружения: удаленный стенд, почта, платежка, браузерный live-flow
+- `smoke` - короткий критичный набор сценариев
+- `regression` - более широкий регрессионный набор
+- `critical` - сценарии высокого приоритета, если нужен отдельный запуск по приоритету
+
+Комбинации, которые реально используются:
+
+- `smoke and integration` - live smoke на реальном стенде
+- `integration` - полный live integration контур
+- `unit or pr_safe` - стабильный контур для Fast CI
+
+Важно:
+- `smoke` и `integration` не исключают друг друга
+- если тест ходит в удаленный стенд, он считается `integration`, даже если это тестовый, а не production контур
+- `pr_safe` может пересекаться с `integration`, но такие тесты добавляются в Fast CI только после стабильного baseline-прогона
+- для известных backend-багов используется строгий `xfail`: если баг исправлен и тест неожиданно проходит, CI должен подсветить это как сигнал снять `xfail`
 
 ## Mail integration tests
 
-Для mail-слоя используется реальный IMAP-ящик.
+Для mail-слоя используется реальный IMAP-ящик. Сейчас подходит `mailbox.org`, но можно использовать любой рабочий IMAP-ящик. Креды хранятся локально в `.env` и читаются через `resources/mail_creds.py`.
 
-Сейчас в проекте как тестовый ящик удобно использовать `mailbox.org`, потому что он поддерживает IMAP и подходит для проверки `MailClient`. Если у команды появится другой рабочий IMAP-ящик, можно использовать его.
+Mail integration сейчас покрывает flow письма верификации `Verify Your Email`.
 
-### Mail credentials
-
-Креды для IMAP хранятся локально в `.env` и читаются через `resources/mail_creds.py`.
-
-`resources/mail_creds.py` нужен как конфигурационный слой, чтобы не хранить секреты прямо в коде.
-
-На текущий момент integration-тест покрывает flow письма верификации (`Verify Your Email`). Если позже появятся другие mail-flow, для них лучше добавлять отдельные тесты и отдельные описания.
-
-Что важно:
+Ограничения:
 - письмо с верификацией может попасть в спам
 - письмо может вообще не дойти до тестового ящика
 - integration-тест не запускается автоматически
-- этот тест лучше запускать вручную, когда нужно проверить живой mail-flow
-- если письмо со стенда приходит в другой ящик, его можно переслать или заново отправить на рабочий IMAP-ящик, который читает `MailClient`
+- такой тест лучше использовать как ручную live-проверку
 
 Перед запуском:
 1. Подготовить рабочий mailbox с IMAP-доступом
@@ -197,20 +198,11 @@ uv run pytest tests/mail/
 uv run ruff check .
 ```
 
-Для чего:
-- проверяет импорты, базовые style-ошибки и другие lint-правила
-- используется как обязательная проверка перед коммитом и в CI
-
 ### Проверить форматирование без изменений
 
 ```bash
 uv run ruff format . --check
 ```
-
-Для чего:
-- показывает, соответствует ли код текущему форматированию
-- полезно перед PR и в CI
-- если команда падает, значит `ruff format .` хочет что-то переформатировать
 
 ### Автоматически исправить часть lint-проблем
 
@@ -218,19 +210,11 @@ uv run ruff format . --check
 uv run ruff check . --fix
 ```
 
-Для чего:
-- автоматически исправляет безопасные lint-проблемы, которые `ruff` умеет чинить сам
-- удобно использовать перед коммитом
-
 ### Отформатировать весь проект
 
 ```bash
 uv run ruff format .
 ```
-
-Для чего:
-- приводит код к единому стилю форматирования
-- обычно запускается после `uv run ruff check . --fix`
 
 ### Рекомендуемый локальный порядок перед коммитом
 
@@ -244,15 +228,30 @@ uv run pytest --collect-only
 
 ## Pre-commit
 
-Установка git hooks:
+### Установка pre-commit hooks
+
+Важно:
+- `pre-commit` hooks не устанавливаются автоматически ни через `git pull`, ни через `uv sync`
+- после первого клонирования репозитория hooks нужно установить вручную
 
 ```bash
 uv run pre-commit install
 ```
 
 Если hook что-то исправил автоматически:
-- снова проверь изменения
-- снова выполни `git add -A`
+- проверь изменения
+- выполни `git add -A`
+
+Полезные команды:
+
+```bash
+uv run pre-commit run --all-files
+uv run pre-commit autoupdate
+uv sync --python 3.14
+uv run pre-commit run --all-files
+```
+
+`pre-commit` проверяет и форматирует код до коммита. В CI эти же базовые проверки дублируются шагами `ruff check` и `ruff format --check`.
 
 ## Структура проекта
 
@@ -287,7 +286,9 @@ uv run pre-commit install
 
 - `uv run ruff check .`
 - `uv run ruff format . --check`
-- `uv run pytest`
+- `uv run pytest -m "unit or pr_safe"`
+- для расширения `pr_safe` прогнать `unit or pr_safe` несколько раз подряд и зафиксировать baseline
+- при изменениях в live-контуре дополнительно прогнать `smoke and integration` вручную
 - ветка обновлена через `merge origin/master`
 - новые зависимости добавлены в `pyproject.toml` и `uv.lock`
 - если менялись env-переменные, обновлен `.env.example`

@@ -1,6 +1,7 @@
-from custom_requester.custom_requester import CustomRequester
-from constants.constants import BASE_URL
 from typing import Any, List, Optional
+
+from constants.constants import BASE_URL
+from custom_requester.custom_requester import CustomRequester
 
 
 class AuthAPI(CustomRequester):
@@ -57,7 +58,12 @@ class AuthAPI(CustomRequester):
         """
         Выход пользователя из системы.
         """
-        return self.send_request(method="GET", endpoint="auth/logout", expected_status=200)
+        expected_status = kwargs.get("expected_status", 200)
+        return self.send_request(
+            method="GET",
+            endpoint="auth/logout",
+            expected_status=expected_status,
+        )
 
     def profile(self, *args, **kwargs):
         """
