@@ -5,7 +5,7 @@ from models.Subscriptions.model_subscription import ModelSubscriptionResponse
 from payloads.subscription_rates import TarifList
 from utils.helpers import DataUtils
 
-pytestmark = [pytest.mark.api, pytest.mark.integration, pytest.mark.regression, pytest.mark.pr_safe]
+pytestmark = [pytest.mark.api, pytest.mark.integration, pytest.mark.regression]
 
 
 @pytest.mark.smoke
