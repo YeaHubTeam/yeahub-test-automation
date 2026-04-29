@@ -108,7 +108,7 @@ uv run pytest -v
 uv run pytest -m smoke
 uv run pytest -m "smoke and api"
 uv run pytest -m "critical or regression"
-uv run pytest -m "unit and not integration"
+uv run pytest -m "unit or pr_safe"
 uv run pytest -m "smoke and integration"
 uv run pytest -m "integration"
 uv run pytest --collect-only
@@ -122,7 +122,7 @@ uv run pytest --collect-only
 
 `Fast CI` — `.github/workflows/ci.yml`
 - запускается автоматически на `push` и `pull_request`
-- проверяет `ruff check .`, `ruff format . --check` и `pytest -m "unit and not integration"`
+- проверяет `ruff check .`, `ruff format . --check`, preflight API healthcheck и `pytest -m "unit or pr_safe"`
 - `Allure` для этого контура не используется, чтобы PR-пайплайн оставался быстрым и простым
 
 `Integration CI` — `.github/workflows/integration.yml`
@@ -140,6 +140,7 @@ Artifacts доступны на странице конкретного workflow
 Базовые маркеры:
 
 - `unit` - изолированные тесты без зависимости от удаленного стенда
+- `pr_safe` - стабильные тесты, разрешенные для запуска в PR-контуре
 - `api` - HTTP/API сценарии
 - `ui` - браузерные UI сценарии
 - `integration` - тесты, которые зависят от реального внешнего окружения: удаленный стенд, почта, платежка, браузерный live-flow
@@ -151,11 +152,13 @@ Artifacts доступны на странице конкретного workflow
 
 - `smoke and integration` - live smoke на реальном стенде
 - `integration` - полный live integration контур
-- `unit and not integration` - стабильный быстрый контур для Fast CI
+- `unit or pr_safe` - стабильный контур для Fast CI
 
 Важно:
 - `smoke` и `integration` не исключают друг друга
 - если тест ходит в удаленный стенд, он считается `integration`, даже если это тестовый, а не production контур
+- `pr_safe` может пересекаться с `integration`, но такие тесты добавляются в Fast CI только после стабильного baseline-прогона
+- для известных backend-багов используется строгий `xfail`: если баг исправлен и тест неожиданно проходит, CI должен подсветить это как сигнал снять `xfail`
 
 ## Mail integration tests
 
@@ -283,7 +286,8 @@ uv run pre-commit run --all-files
 
 - `uv run ruff check .`
 - `uv run ruff format . --check`
-- `uv run pytest -m "unit and not integration"`
+- `uv run pytest -m "unit or pr_safe"`
+- для расширения `pr_safe` прогнать `unit or pr_safe` несколько раз подряд и зафиксировать baseline
 - при изменениях в live-контуре дополнительно прогнать `smoke and integration` вручную
 - ветка обновлена через `merge origin/master`
 - новые зависимости добавлены в `pyproject.toml` и `uv.lock`

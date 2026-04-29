@@ -30,6 +30,7 @@ log_date_format = "%Y-%m-%d %H:%M:%S"
 log_cli_level = "INFO"
 log_cli_format = "%(asctime)s %(levelname)s %(message)s"
 log_cli_date_format = "%Y-%m-%d %H:%M:%S"
+xfail_strict = true
 markers = [
     "smoke: Смок тесты",
     "critical: Критичные тесты",
@@ -37,6 +38,7 @@ markers = [
     "slow: Медленные тесты",
     "negative: Негативные тесты",
     "unit: Unit-тесты",
+    "pr_safe: Стабильные тесты, безопасные для запуска в PR-контуре",
     "api: API-тесты",
     "ui: UI-тесты",
     "db: DB-тесты",

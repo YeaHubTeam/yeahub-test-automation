@@ -77,7 +77,7 @@ def static_user(api_manager):
     api_manager.auth_api.authenticate((VerifiedUserCreds.EMAIL, VerifiedUserCreds.PASSWORD))
     validate_user = AuthModel.model_validate(data_user)
     yield validate_user.user
-    api_manager.auth_api.logout()
+    api_manager.auth_api.logout(expected_status=[200, 401])
 
 
 @pytest.fixture(scope="session")

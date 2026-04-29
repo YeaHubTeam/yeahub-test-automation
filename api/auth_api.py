@@ -58,7 +58,12 @@ class AuthAPI(CustomRequester):
         """
         Выход пользователя из системы.
         """
-        return self.send_request(method="GET", endpoint="auth/logout", expected_status=200)
+        expected_status = kwargs.get("expected_status", 200)
+        return self.send_request(
+            method="GET",
+            endpoint="auth/logout",
+            expected_status=expected_status,
+        )
 
     def profile(self, *args, **kwargs):
         """

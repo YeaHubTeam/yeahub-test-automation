@@ -3,7 +3,7 @@ import pytest
 
 from api.api_manager import ApiManager
 
-pytestmark = [pytest.mark.api, pytest.mark.integration, pytest.mark.regression]
+pytestmark = [pytest.mark.api, pytest.mark.integration, pytest.mark.regression, pytest.mark.pr_safe]
 
 
 @allure.epic("Тест - Выхода пользователя из системы")
