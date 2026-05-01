@@ -1,0 +1,120 @@
+name: Integration (Live)
+
+on:
+  workflow_dispatch:
+    inputs:
+      scope:
+        description: "Which integration scope to run"
+        required: true
+        default: smoke
+        type: choice
+        options:
+          - smoke
+          - full
+  schedule:
+    - cron: "0 2 * * *"
+
+jobs:
+  integration-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      VERIFIED_USER_EMAIL: ${{ secrets.VERIFIED_USER_EMAIL }}
+      VERIFIED_USER_PASSWORD: ${{ secrets.VERIFIED_USER_PASSWORD }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.14
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Sync dependencies
+        run: uv sync --python 3.14
+
+      - name: Install Allure CLI
+        run: npm install -g allure-commandline
+
+      - name: Install Playwright Chromium
+        run: uv run playwright install chromium
+
+      - name: Preflight API healthcheck
+        shell: bash
+        run: |
+          set -euo pipefail
+          SUBSCRIPTIONS_URL="https://api.yeatwork.ru/subscriptions"
+          AUTH_URL="https://api.yeatwork.ru/auth/refresh"
+          for attempt in 1 2 3 4 5; do
+            subscriptions_status="$(curl --connect-timeout 5 --max-time 15 -sS -o /dev/null -w "%{http_code}" "$SUBSCRIPTIONS_URL" || true)"
+            auth_status="$(curl --connect-timeout 5 --max-time 15 -sS -o /dev/null -w "%{http_code}" "$AUTH_URL" || true)"
+
+            if [ "$subscriptions_status" = "200" ] && { [ "$auth_status" = "200" ] || [ "$auth_status" = "401" ] || [ "$auth_status" = "403" ]; }; then
+              echo "API preflight is healthy on attempt $attempt (subscriptions=$subscriptions_status, auth=$auth_status)"
+              exit 0
+            fi
+            echo "API preflight not ready (subscriptions=$subscriptions_status, auth=$auth_status), attempt $attempt/5"
+            if [ "$attempt" = "5" ]; then
+              break
+            fi
+            sleep 10
+          done
+          echo "API preflight failed. Expected subscriptions=200 and auth=200/401/403 after 5 attempts."
+          exit 1
+
+      - name: Run integration tests with Allure
+        id: integration_tests
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.scope }}" = "smoke" ]; then
+            MARK_EXPR="smoke and integration"
+          else
+            MARK_EXPR="integration"
+          fi
+          echo "Running pytest with marker expression: ${MARK_EXPR}"
+          uv run pytest -m "${MARK_EXPR}" --alluredir=allure-results
+
+      - name: Generate Allure HTML report
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -d allure-results ] && [ "$(find allure-results -type f | wc -l)" -gt 0 ]; then
+            allure generate allure-results --clean -o allure-report
+          else
+            mkdir -p allure-report
+            printf '%s\n' '<html><body><h1>No Allure results were generated</h1></body></html>' > allure-report/index.html
+          fi
+
+      - name: Upload allure-results artifact
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-results-${{ github.run_number }}
+          path: allure-results
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload allure-report artifact
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-report-${{ github.run_number }}
+          path: allure-report
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Fail workflow if integration tests failed
+        if: ${{ steps.integration_tests.outcome == 'failure' }}
+        run: exit 1

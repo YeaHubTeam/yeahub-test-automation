@@ -1,4 +1,4 @@
-name: CI
+name: CI (Fast)
 
 on:
   push:
@@ -13,6 +13,7 @@ on:
 jobs:
   tests:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
       - name: Checkout repository
@@ -29,14 +30,37 @@ jobs:
       - name: Sync dependencies
         run: uv sync --python 3.14
 
-      - name: Install Playwright Chromium
-        run: uv run playwright install chromium
-
       - name: Ruff check
         run: uv run ruff check .
 
       - name: Ruff format check
         run: uv run ruff format . --check
 
-      - name: Run pytest
-        run: uv run pytest
+      - name: Preflight API healthcheck
+        shell: bash
+        run: |
+          set -euo pipefail
+          SUBSCRIPTIONS_URL="https://api.yeatwork.ru/subscriptions"
+          AUTH_URL="https://api.yeatwork.ru/auth/refresh"
+
+          subscriptions_status="$(curl --connect-timeout 5 --max-time 15 -sS -o /dev/null -w "%{http_code}" "$SUBSCRIPTIONS_URL" || true)"
+          if [ "$subscriptions_status" != "200" ]; then
+            echo "API preflight failed. Expected HTTP 200 from $SUBSCRIPTIONS_URL, got HTTP $subscriptions_status."
+            exit 1
+          fi
+
+          auth_status="$(curl --connect-timeout 5 --max-time 15 -sS -o /dev/null -w "%{http_code}" "$AUTH_URL" || true)"
+          case "$auth_status" in
+            200|401|403)
+              echo "Auth preflight is healthy enough (HTTP $auth_status)."
+              ;;
+            *)
+              echo "Auth preflight failed. Expected HTTP 200/401/403 from $AUTH_URL, got HTTP $auth_status."
+              exit 1
+              ;;
+          esac
+
+          echo "API preflight is healthy."
+
+      - name: Run pytest (PR-safe scope)
+        run: uv run pytest -m "unit or pr_safe"

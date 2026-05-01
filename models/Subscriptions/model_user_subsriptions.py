@@ -1,20 +1,26 @@
 from datetime import datetime
 from typing import List, Optional
-from pydantic import Field, ConfigDict
-from models.base_model import BaseResponse # Твой базовый класс
+
+from pydantic import ConfigDict, Field
+
+from models.base_model import BaseResponse  # Твой базовый класс
+
 
 class RoleModel(BaseResponse):
     """
     Вспомогательный класс для поля roles
     """
+
     id: int
     name: str
     permissions: List[str] = Field(default_factory=list)
+
 
 class SubscriptionDetailModel(BaseResponse):
     """
     Вспомогательный класс для поля subscription
     """
+
     id: int
     name: str
     code: str
@@ -27,10 +33,12 @@ class SubscriptionDetailModel(BaseResponse):
     parent_id: Optional[int] = Field(None, alias="parentId")
     roles: List[RoleModel]
 
+
 class UserSubscriptionResponse(BaseResponse):
     """
     Класс для валидации данных подписки пользователя
     """
+
     id: str
     create_date: datetime = Field(..., alias="createDate")
     end_date: Optional[datetime] = Field(None, alias="endDate")
@@ -42,11 +50,12 @@ class UserSubscriptionResponse(BaseResponse):
     fixed_price: Optional[int] = Field(None, alias="fixedPrice")
     subscription: SubscriptionDetailModel
 
+
 class ModelErrorResponse(BaseResponse):
     """
     Класс для валидации данных об ошибке
     """
+
     message: str = Field(..., description="Сообщение об ошибке")
     statusCode: int = Field(..., description="Статус код")
     description: str = Field(..., description="Описание ошибки")
-

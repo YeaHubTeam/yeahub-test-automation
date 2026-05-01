@@ -4,6 +4,8 @@ import pytest
 from api.api_manager import ApiManager
 from models.refresh_token_response_model import RefreshTokenResponse
 
+pytestmark = [pytest.mark.api, pytest.mark.integration, pytest.mark.regression, pytest.mark.pr_safe]
+
 
 @allure.epic("Тест - Refresh authentication token")
 @pytest.mark.api

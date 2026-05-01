@@ -1,9 +1,11 @@
-from pydantic import TypeAdapter
-from models.Subscriptions.model_user_subsriptions import UserSubscriptionResponse
 from typing import List
 
-class DataUtils:
+from pydantic import TypeAdapter
 
+from models.Subscriptions.model_user_subsriptions import UserSubscriptionResponse
+
+
+class DataUtils:
     @staticmethod
     def find_item(items, condition, transform=lambda x: x):
         """
@@ -17,7 +19,7 @@ class DataUtils:
         return transform(item) if item is not None else None
 
     @staticmethod
-    def type_adapter(model ,response):
+    def type_adapter(model, response):
         """
         Валидирует и преобразует входные данные в указанную модель Pydantic.
 

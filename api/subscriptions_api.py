@@ -1,10 +1,12 @@
-from custom_requester.custom_requester import CustomRequester
 from constants.constants import BASE_URL
+from custom_requester.custom_requester import CustomRequester
+
 
 class SubscriptionsAPI(CustomRequester):
     """
     Класс для работы с подпиской
     """
+
     SUBSCRIPTIONS = "subscriptions"
     SUBSCRIPTIONS_TRAIL = "subscriptions/trial"
     SUBSCRIPTIONS_USER = "subscriptions/users/"
@@ -19,9 +21,7 @@ class SubscriptionsAPI(CustomRequester):
         :param expected_status: ожидаемый статус код
         """
         return self.send_request(
-            method="GET",
-            endpoint=self.SUBSCRIPTIONS,
-            expected_status=expected_status
+            method="GET", endpoint=self.SUBSCRIPTIONS, expected_status=expected_status
         )
 
     def get_subscriptions_users(self, user_id, expected_status=200):
@@ -33,7 +33,7 @@ class SubscriptionsAPI(CustomRequester):
         return self.send_request(
             method="GET",
             endpoint=f"{self.SUBSCRIPTIONS_USER}{user_id}",
-            expected_status=expected_status
+            expected_status=expected_status,
         )
 
     def trial_subscription(self, expected_status=204):
@@ -42,9 +42,7 @@ class SubscriptionsAPI(CustomRequester):
         :param expected_status: ожидаемый статус код
         """
         return self.send_request(
-            method="GET",
-            endpoint=self.SUBSCRIPTIONS_TRAIL,
-            expected_status=expected_status
+            method="GET", endpoint=self.SUBSCRIPTIONS_TRAIL, expected_status=expected_status
         )
 
     def subscriptions_payment_pending(self, subsId, email=None, expected_status=200):
@@ -62,7 +60,7 @@ class SubscriptionsAPI(CustomRequester):
             method="GET",
             params=query_params,
             endpoint=f"{self.SUBSCRIPTIONS}/{subsId}{self.PAYMENT_INIT}",
-            expected_status=expected_status
+            expected_status=expected_status,
         )
 
     def delete_subscriptions(self, request_body, expected_status=200):
@@ -75,5 +73,5 @@ class SubscriptionsAPI(CustomRequester):
             method="DELETE",
             data=request_body,
             endpoint=self.SUBSCRIPTIONS_USER,
-            expected_status=expected_status
+            expected_status=expected_status,
         )
