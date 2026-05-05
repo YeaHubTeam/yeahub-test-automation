@@ -1,4 +1,5 @@
 import random
+import uuid
 
 import allure
 import pytest
@@ -54,7 +55,7 @@ class TestSubscriptionNegative:
             request_body = {
                 "subscriptionId": id_subscriptions,
                 "userId": logged_in_user["id"],
-                "orderId": "string",
+                "orderId": str(uuid.uuid4()),
             }
         with allure.step("Запрос на удаление подписки"):
             response = api_manager.subscriptions_api.delete_subscriptions(
@@ -74,7 +75,7 @@ class TestSubscriptionNegative:
         request_body = {
             "subscriptionId": random.randint(10, 20),
             "userId": static_user.id,
-            "orderId": "string",
+            "orderId": str(uuid.uuid4()),
         }
 
         with allure.step("Запрос на удаление подписки"):

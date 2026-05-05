@@ -12,6 +12,9 @@ __pycache__/
 venv/
 ENV/
 
+# Build artifacts
+build/
+
 # pytest cache
 .pytest_cache/
 allure-results/
