@@ -1,23 +1,23 @@
-## Task
-`YH-123`: <paste tracker link here>
+## Задача
+`YH-123`: <вставь ссылку на задачу>
 
-## What Was Done
+## Что сделано
 - 
 - 
 - 
 
-## How To Validate
+## Как проверить
 - `pytest tests/path/to/tests/`
 - `pytest -m "smoke and api"`
 
-## Checklist
-- [ ] Linter passed (`ruff check .` and `ruff format --check .`)
-- [ ] Relevant tests passed locally
-- [ ] Branch merged with latest `origin/master`
-- [ ] Required pytest marks are set correctly
-- [ ] New marks added to pytest config (if applicable)
-- [ ] Dependencies updated and pinned (if applicable)
+## Чеклист
+- [ ] Линтер пройден (`ruff check .` и `ruff format --check .`)
+- [ ] Релевантные тесты проходят локально
+- [ ] Ветка обновлена из `origin/master`
+- [ ] Обязательные pytest marks проставлены корректно
+- [ ] Новые marks добавлены в pytest-конфиг (если применимо)
+- [ ] Зависимости обновлены и зафиксированы (если применимо)
 
-## Notes For Reviewer
-- Risks/limitations:
-- Areas to focus on:
+## Комментарий для ревьюера
+- Риски/ограничения:
+- Зоны фокуса в ревью:
