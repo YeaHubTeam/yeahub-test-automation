@@ -577,7 +577,7 @@ wheels = [
 
 [[package]]
 name = "testit-adapter-pytest"
-version = "4.1.12.post570"
+version = "4.1.12"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "attrs" },
@@ -585,28 +585,28 @@ dependencies = [
     { name = "pytest-xdist" },
     { name = "testit-python-commons" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/d4/40/7f53d50de9e75cf0ecbe10c65d8f0e53e369ee757337cc87f8b05b91d37f/testit_adapter_pytest-4.1.12.post570.tar.gz", hash = "sha256:0b014d7ac0cca4ef76973ec4464a4913dff94ac73f018fbd399b7f35472f3d2d", size = 20593, upload-time = "2026-04-30T06:56:14.498Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/f8/95/f046c078a28eae8d7345cb83bb7a8498e50062b38e187a7db94c03c4a983/testit_adapter_pytest-4.1.12.tar.gz", hash = "sha256:c7028113e65f63dcb93ca534863491c0a3652292f0c85ea571c7782e89b7fc1e", size = 20554, upload-time = "2026-04-30T06:43:38.062Z" }
 
 [[package]]
 name = "testit-api-client"
-version = "7.5.5.post570"
+version = "7.5.6"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "python-dateutil" },
     { name = "urllib3" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/c9/88/bafa0f10a1d897dc08ebcdb3e80ce9b6d67bc67b83ddf137d4c7163b5025/testit_api_client-7.5.5.post570.tar.gz", hash = "sha256:2052f7f02e099d3d9cef766f6f0720794e0b76169398be860ffe3d0b698e69e6", size = 496683, upload-time = "2026-04-07T13:17:28.339Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/86/9f/34839ed97fa0c96374b448d819adfa5c36edc170b7b752a7bb7f593d52ef/testit_api_client-7.5.6.tar.gz", hash = "sha256:180097291f91257956db747056ce8ca2f4ea029fe57a054c8aa78e232a23fefd", size = 492485, upload-time = "2026-04-24T13:35:24.456Z" }
 
 [[package]]
 name = "testit-python-commons"
-version = "4.1.12.post570"
+version = "4.1.12"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "pluggy" },
     { name = "testit-api-client" },
     { name = "tomli" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/0a/eb/6fb93098c3f892c8880de0b57b941837b0bd1a5a9d63488a773c23d02adb/testit_python_commons-4.1.12.post570.tar.gz", hash = "sha256:844b56b32406746a4c3684577a68d86033977081e9721270d068cdc4ac80affa", size = 76160, upload-time = "2026-04-30T06:56:22.942Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/e6/be/5856d62541c8236cb4eb78a6963aa4ac7a77fe8bf95c3d9163db94d1eca3/testit_python_commons-4.1.12.tar.gz", hash = "sha256:fe8df24e6c65a974faf330fb515c2a50e5489dc87946bf36326b0f321bb47873", size = 76082, upload-time = "2026-04-30T06:43:43.317Z" }
 
 [[package]]
 name = "text-unidecode"
@@ -740,5 +740,5 @@ dev = [
     { name = "pytest-check", specifier = "==1.1.1" },
     { name = "pytest-playwright", specifier = ">=0.7.2" },
     { name = "ruff", specifier = "==0.11.8" },
-    { name = "testit-adapter-pytest" },
+    { name = "testit-adapter-pytest", specifier = "==4.1.12" },
 ]
