@@ -41,6 +41,30 @@ class TestSubscriptionPositive:
                 transform=lambda sub: sub.id,
             )
 
+        with allure.step("Предочистка pending-подписки для стабильного запуска"):
+            existing_subscriptions = api_manager.subscriptions_api.get_subscriptions_users(
+                static_user.id
+            ).json()
+            validated_subscriptions = DataUtils.type_adapter(
+                List[UserSubscriptionResponse], existing_subscriptions
+            )
+            pending_subscription = DataUtils.find_item(
+                items=validated_subscriptions,
+                condition=lambda sub: (
+                    sub.subscription_id == id_subscriptions
+                    and sub.state in ["pending_payment", "active"]
+                ),
+            )
+            if pending_subscription:
+                cleanup_body = {
+                    "subscriptionId": id_subscriptions,
+                    "userId": static_user.id,
+                    "orderId": "string",
+                }
+                api_manager.subscriptions_api.delete_subscriptions(
+                    cleanup_body, expected_status=[200, 404]
+                )
+
         with allure.step("Отправка запроса на оплату подписки"):
             response = api_manager.subscriptions_api.subscriptions_payment_pending(
                 id_subscriptions, static_user.email
