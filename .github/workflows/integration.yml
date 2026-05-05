@@ -26,6 +26,7 @@ jobs:
       TMS_PROJECT_ID: ${{ secrets.TMS_PROJECT_ID }}
       TMS_CONFIGURATION_ID: ${{ secrets.TMS_CONFIGURATION_ID }}
       TMS_TEST_RUN_NAME: ${{ secrets.TMS_TEST_RUN_NAME }}
+      TMS_ADAPTER_MODE: ${{ secrets.TMS_ADAPTER_MODE }}
 
     steps:
       - name: Checkout repository
