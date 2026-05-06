@@ -149,16 +149,16 @@ def payment_link_subscriptions(api_manager, static_user, get_list_subscriptions)
     teardown_validated = DataUtils.type_adapter(
         list[UserSubscriptionResponse], teardown_subscriptions
     )
-    pending_row = DataUtils.find_item(
+    teardown_row = DataUtils.find_item(
         items=teardown_validated,
         condition=lambda sub: (
-            sub.subscription_id == id_subscriptions and sub.state == "pending_payment"
+            sub.subscription_id == id_subscriptions and sub.state in ["pending_payment", "active"]
         ),
     )
-    if pending_row:
+    if teardown_row:
         request_body = {
             "subscriptionId": id_subscriptions,
             "userId": static_user.id,
-            "orderId": pending_row.id,
+            "orderId": teardown_row.id,
         }
         api_manager.subscriptions_api.delete_subscriptions(request_body)
