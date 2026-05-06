@@ -21,6 +21,7 @@ dev = [
     "pre-commit==4.5.1",
     "pytest-playwright>=0.7.2",
     "pytest-check==1.1.1",
+    "testit-adapter-pytest==4.1.12",
 ]
 
 [tool.pytest.ini_options]

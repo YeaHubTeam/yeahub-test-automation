@@ -33,37 +33,18 @@ pytestmark = [pytest.mark.api, pytest.mark.integration, pytest.mark.regression]
 class TestSubscriptionPositive:
     @pytest.mark.smoke
     @allure.title("Создание подписки с ожиданием оплаты")
-    def test_subscription_pyments(self, static_user, api_manager, get_list_subscriptions):
-        with allure.step("Получаем ID подписки"):
-            id_subscriptions = DataUtils.find_item(
-                items=get_list_subscriptions,
-                condition=lambda sub: sub.name == NAME_SUBSCRIPTIONS,
-                transform=lambda sub: sub.id,
-            )
-
-        with allure.step("Отправка запроса на оплату подписки"):
-            response = api_manager.subscriptions_api.subscriptions_payment_pending(
-                id_subscriptions, static_user.email
-            ).text
-
+    def test_subscription_pyments(self, payment_link_subscriptions):
         with allure.step("Разбиваем url на части"):
-            result = urlparse(response)
+            result = urlparse(payment_link_subscriptions)
 
         with allure.step("Assert"):
             """
             result.scheme - проверяет что URL имеет протокол
             result.netloc - проверяет наличие домена
             """
-            assert all([result.scheme, result.netloc]), f"Строка {response} не является ссылкой"
-
-        with allure.step("Удаление подписки для освобождения ресурса"):
-            request_body = {
-                "subscriptionId": id_subscriptions,
-                "userId": static_user.id,
-                "orderId": "string",
-            }
-
-            api_manager.subscriptions_api.delete_subscriptions(request_body)
+            assert all([result.scheme, result.netloc]), (
+                f"Строка {payment_link_subscriptions} не является ссылкой"
+            )
 
     @allure.title("Проверка данных для оплаты")
     def test_payment_details(self, payment_link_subscriptions, static_user):
@@ -148,17 +129,16 @@ class TestSubscriptionPositive:
             validate_response = DataUtils.type_adapter(List[UserSubscriptionResponse], response)
 
         with allure.step("Выибираем нужную подписку из списка"):
-            subscription_id = DataUtils.find_item(
+            user_subscription = DataUtils.find_item(
                 items=validate_response,
                 condition=lambda sub: sub.state == "pending_payment",
-                transform=lambda sub: sub.subscription_id,
             )
 
         with allure.step("Удаление подписки "):
             request_body = {
-                "subscriptionId": subscription_id,
+                "subscriptionId": user_subscription.subscription_id,
                 "userId": static_user.id,
-                "orderId": "string",
+                "orderId": user_subscription.id,
             }
             api_manager.subscriptions_api.delete_subscriptions(request_body)
 

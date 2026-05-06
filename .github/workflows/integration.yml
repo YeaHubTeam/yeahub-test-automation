@@ -21,6 +21,12 @@ jobs:
     env:
       VERIFIED_USER_EMAIL: ${{ secrets.VERIFIED_USER_EMAIL }}
       VERIFIED_USER_PASSWORD: ${{ secrets.VERIFIED_USER_PASSWORD }}
+      TMS_URL: ${{ secrets.TMS_URL }}
+      TMS_PRIVATE_TOKEN: ${{ secrets.TMS_PRIVATE_TOKEN }}
+      TMS_PROJECT_ID: ${{ secrets.TMS_PROJECT_ID }}
+      TMS_CONFIGURATION_ID: ${{ secrets.TMS_CONFIGURATION_ID }}
+      TMS_TEST_RUN_NAME: "Daily Run ${{ github.run_number }} / ${{ github.event_name }}"
+      TMS_ADAPTER_MODE: ${{ secrets.TMS_ADAPTER_MODE }}
 
     steps:
       - name: Checkout repository
@@ -83,7 +89,7 @@ jobs:
             MARK_EXPR="integration"
           fi
           echo "Running pytest with marker expression: ${MARK_EXPR}"
-          uv run pytest -m "${MARK_EXPR}" --alluredir=allure-results
+          uv run pytest -m "${MARK_EXPR}" --alluredir=allure-results --testit
 
       - name: Generate Allure HTML report
         if: ${{ always() }}

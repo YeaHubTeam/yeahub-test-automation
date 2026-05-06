@@ -1,17 +1,40 @@
 import pytest
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 from api.api_manager import ApiManager
 from models.auth_model import AuthModel
 from models.Subscriptions.model_subscription import ModelSubscriptionResponse
+from models.Subscriptions.model_user_subsriptions import UserSubscriptionResponse
 from resources.user_creds import VerifiedUserCreds
 from utils.data_generator import DataGenerator
 from utils.helpers import DataUtils
 
 
+def _session_with_retries() -> requests.Session:
+    """Транспортные ретраи при кратковременных 502/503/504 и обрывах соединения (без POST).
+
+    raise_on_status=False — после исчерпания попыток вернуть последний ответ (например 503),
+    чтобы CustomRequester по-прежнему отдавал ValueError со статусом, а не RetryError.
+    """
+    session = requests.Session()
+    retry = Retry(
+        total=3,
+        backoff_factor=0.5,
+        status_forcelist=(502, 503, 504),
+        allowed_methods=frozenset({"DELETE", "GET", "HEAD", "OPTIONS", "PUT", "TRACE"}),
+        raise_on_status=False,
+    )
+    adapter = HTTPAdapter(max_retries=retry)
+    session.mount("https://", adapter)
+    session.mount("http://", adapter)
+    return session
+
+
 @pytest.fixture(scope="session")
 def session():
-    session = requests.Session()
+    session = _session_with_retries()
     yield session
     session.close()
 
@@ -94,15 +117,48 @@ def payment_link_subscriptions(api_manager, static_user, get_list_subscriptions)
         condition=lambda sub: sub.name == "Премиум на 3 месяца",
         transform=lambda sub: sub.id,
     )
+    existing_subscriptions = api_manager.subscriptions_api.get_subscriptions_users(
+        static_user.id
+    ).json()
+    validated_subscriptions = DataUtils.type_adapter(
+        list[UserSubscriptionResponse], existing_subscriptions
+    )
+    pending_subscription = DataUtils.find_item(
+        items=validated_subscriptions,
+        condition=lambda sub: (
+            sub.subscription_id == id_subscriptions and sub.state in ["pending_payment", "active"]
+        ),
+    )
+    if pending_subscription:
+        cleanup_body = {
+            "subscriptionId": id_subscriptions,
+            "userId": static_user.id,
+            "orderId": pending_subscription.id,
+        }
+        api_manager.subscriptions_api.delete_subscriptions(cleanup_body, expected_status=[200, 404])
+
     response = api_manager.subscriptions_api.subscriptions_payment_pending(
         id_subscriptions,
         static_user.email,
     )
     payment_url = response.text
     yield payment_url
-    request_body = {
-        "subscriptionId": id_subscriptions,
-        "userId": static_user.id,
-        "orderId": "string",
-    }
-    api_manager.subscriptions_api.delete_subscriptions(request_body)
+    teardown_subscriptions = api_manager.subscriptions_api.get_subscriptions_users(
+        static_user.id
+    ).json()
+    teardown_validated = DataUtils.type_adapter(
+        list[UserSubscriptionResponse], teardown_subscriptions
+    )
+    teardown_row = DataUtils.find_item(
+        items=teardown_validated,
+        condition=lambda sub: (
+            sub.subscription_id == id_subscriptions and sub.state in ["pending_payment", "active"]
+        ),
+    )
+    if teardown_row:
+        request_body = {
+            "subscriptionId": id_subscriptions,
+            "userId": static_user.id,
+            "orderId": teardown_row.id,
+        }
+        api_manager.subscriptions_api.delete_subscriptions(request_body)
