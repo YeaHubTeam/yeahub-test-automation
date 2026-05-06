@@ -33,73 +33,18 @@ pytestmark = [pytest.mark.api, pytest.mark.integration, pytest.mark.regression]
 class TestSubscriptionPositive:
     @pytest.mark.smoke
     @allure.title("Создание подписки с ожиданием оплаты")
-    def test_subscription_pyments(self, static_user, api_manager, get_list_subscriptions):
-        with allure.step("Получаем ID подписки"):
-            id_subscriptions = DataUtils.find_item(
-                items=get_list_subscriptions,
-                condition=lambda sub: sub.name == NAME_SUBSCRIPTIONS,
-                transform=lambda sub: sub.id,
-            )
-
-        with allure.step("Предочистка pending-подписки для стабильного запуска"):
-            existing_subscriptions = api_manager.subscriptions_api.get_subscriptions_users(
-                static_user.id
-            ).json()
-            validated_subscriptions = DataUtils.type_adapter(
-                List[UserSubscriptionResponse], existing_subscriptions
-            )
-            pending_subscription = DataUtils.find_item(
-                items=validated_subscriptions,
-                condition=lambda sub: (
-                    sub.subscription_id == id_subscriptions
-                    and sub.state in ["pending_payment", "active"]
-                ),
-            )
-            if pending_subscription:
-                cleanup_body = {
-                    "subscriptionId": id_subscriptions,
-                    "userId": static_user.id,
-                    "orderId": pending_subscription.id,
-                }
-                api_manager.subscriptions_api.delete_subscriptions(
-                    cleanup_body, expected_status=[200, 404]
-                )
-
-        with allure.step("Отправка запроса на оплату подписки"):
-            response = api_manager.subscriptions_api.subscriptions_payment_pending(
-                id_subscriptions, static_user.email
-            ).text
-
+    def test_subscription_pyments(self, payment_link_subscriptions):
         with allure.step("Разбиваем url на части"):
-            result = urlparse(response)
+            result = urlparse(payment_link_subscriptions)
 
         with allure.step("Assert"):
             """
             result.scheme - проверяет что URL имеет протокол
             result.netloc - проверяет наличие домена
             """
-            assert all([result.scheme, result.netloc]), f"Строка {response} не является ссылкой"
-
-        with allure.step("Удаление подписки для освобождения ресурса"):
-            existing_after_payment = api_manager.subscriptions_api.get_subscriptions_users(
-                static_user.id
-            ).json()
-            validated_after_payment = DataUtils.type_adapter(
-                List[UserSubscriptionResponse], existing_after_payment
+            assert all([result.scheme, result.netloc]), (
+                f"Строка {payment_link_subscriptions} не является ссылкой"
             )
-            user_sub = DataUtils.find_item(
-                items=validated_after_payment,
-                condition=lambda sub: (
-                    sub.subscription.name == NAME_SUBSCRIPTIONS and sub.state == "pending_payment"
-                ),
-            )
-            if user_sub:
-                request_body = {
-                    "subscriptionId": id_subscriptions,
-                    "userId": static_user.id,
-                    "orderId": user_sub.id,
-                }
-                api_manager.subscriptions_api.delete_subscriptions(request_body)
 
     @allure.title("Проверка данных для оплаты")
     def test_payment_details(self, payment_link_subscriptions, static_user):
