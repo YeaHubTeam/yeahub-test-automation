@@ -63,7 +63,7 @@ class SubscriptionsAPI(CustomRequester):
             expected_status=expected_status,
         )
 
-    def delete_subscriptions(self, request_body, expected_status=200):
+    def delete_subscriptions(self, request_body, expected_status=[200, 204]):
         """
         Удаление подписки у пользователя
         :param request_body: тело запроса

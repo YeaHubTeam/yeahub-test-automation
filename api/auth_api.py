@@ -77,30 +77,16 @@ class AuthAPI(CustomRequester):
         """
         return self.send_request(method="GET", endpoint="auth/refresh", expected_status=200)
 
-    # TODO #Нужно отрефачить позже. Жду таск - https://tracker.yandex.ru/YH-1756
-    def verify_sent_email(self, *args, **kwargs):
-        """
-        Верификация email пользователя.
-        """
-        # Accept 400 since we use dummy token
-        expected_status = kwargs.get("expected_status", 200)
-
-        return self.send_request(
-            method="GET",
-            endpoint="auth/verify-email",
-            params={"token": "1"},
-            expected_status=expected_status,
-        )
-
     # TODO - Не доделано! Не использовать пока. Жду таск - https://tracker.yandex.ru/YH-1756
-    def verify_sent_email(self, token, expected_status=200):
+    def verify_sent_email(self, token="1", expected_status=200):
         """
         Верификация email пользователя.
         """
+        params = token if isinstance(token, dict) else {"token": token}
         return self.send_request(
             method="GET",
             endpoint="auth/verify-email",
-            params=token,
+            params=params,
             expected_status=expected_status,
         )
 

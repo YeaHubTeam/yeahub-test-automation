@@ -15,12 +15,11 @@ pytestmark = [pytest.mark.api, pytest.mark.integration, pytest.mark.regression]
 @allure.feature("Получение списка подписок, и проверка полей в каждой подписке")
 class TestSubscriptionValidation:
     @allure.title("Получение списка подписок")
-    def test_get_list_subscriptions(self, static_user, api_manager):
-        with allure.step("Запрос на получение списка подписок"):
-            response = api_manager.subscriptions_api.get_subscriptions().json()
-
+    def test_get_list_subscriptions(self, get_list_subscriptions):
         with allure.step("Pydantic-валидация списка подписок"):
-            validated = DataUtils.type_adapter(list[ModelSubscriptionResponse], response)
+            validated = DataUtils.type_adapter(
+                list[ModelSubscriptionResponse], get_list_subscriptions
+            )
 
         with allure.step("Проверка, что список подписок не пуст"):
             assert validated, "Список подписок пуст"
