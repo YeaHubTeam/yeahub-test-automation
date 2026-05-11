@@ -13,18 +13,17 @@ class DataGenerator:
 
     @staticmethod
     def random_password():
-        letters = random.choice(string.ascii_letters)
-        digits = random.choice(string.digits)
-
-        special_chars = "?@#$%^&*|:"
-        all_chars = string.ascii_letters + string.digits + special_chars
-        remaining_length = random.randint(6, 18)
-        remaining_chars = "".join(random.choices(all_chars, k=remaining_length))
-
-        password = list(letters + digits + remaining_chars)
-        random.shuffle(password)
-
-        return "".join(password)
+        """Пароль для UI/API: длина и набор символов без «спорных» знаков (^| и т.п.)."""
+        lower = random.choice(string.ascii_lowercase)
+        upper = random.choice(string.ascii_uppercase)
+        digit = random.choice(string.digits)
+        special = random.choice("@#$%&*-_+=.")
+        alphabet = string.ascii_letters + string.digits + "@#$%&*-_+=."
+        remaining_length = random.randint(8, 14)
+        remaining = "".join(random.choices(alphabet, k=remaining_length))
+        parts = list(lower + upper + digit + special + remaining)
+        random.shuffle(parts)
+        return "".join(parts)
 
     @staticmethod
     def random_email():

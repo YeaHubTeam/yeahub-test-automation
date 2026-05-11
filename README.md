@@ -87,6 +87,7 @@ cp .env.example .env
 - `MAIL_PASSWORD`
 - `MAIL_FOLDER`
 - `RUN_MAIL_INTEGRATION`
+- опционально (повторная регистрация на тот же email после удаления): `REGISTER_SAME_EMAIL_RETRY_MAX_WAIT_SECONDS`, `REGISTER_SAME_EMAIL_RETRY_POLL_INTERVAL_SECONDS`, `REGISTER_SAME_EMAIL_API_PROBE` — см. комментарии в `.env.example`
 
 ### Для чего они нужны
 
@@ -228,11 +229,23 @@ MAIL_PASSWORD=<app_password>
 - backend может ограничивать частоту отправки verification email (например, не чаще ~1 раза в 60 секунд) — тест e2e умеет ждать и повторять отправку
 - после извлечения ссылки тест удаляет письмо из ящика, чтобы следующий прогон не цеплял старые письма
 
-Запуск e2e:
+Запуск e2e (API-контур, без браузера):
 
 ```bash
 RUN_MAIL_INTEGRATION=1 uv run pytest -q tests/auth/test_auth_verify_email_e2e.py -m "not ui"
 ```
+
+### UI E2E (Playwright): регистрация в браузере → IMAP → онбординг → удаление → опционально тот же email
+
+Отдельный сценарий в `tests/ui/auth/test_register_verify_email_e2e.py`: форма на `/auth/register`, реальный ящик для письма верификации, затем UI-онбординг, удаление аккаунта в настройках и при необходимости вторая регистрация на тот же адрес (см. `REGISTER_SAME_EMAIL_*` в `.env.example` — бэкенд может отвечать `user.user.email.limited_period`).
+
+Пример локального запуска:
+
+```bash
+RUN_MAIL_INTEGRATION=1 uv run pytest tests/ui/auth/test_register_verify_email_e2e.py::test_register_and_verify_email_e2e -v
+```
+
+С браузером на экране: добавь `--headed`. Отчёт в Test IT: добавь `--testit` и задай `TMS_*` в `.env` (см. `pyproject.toml`, секция `[testit]`). Поле **`@testit.externalId`** в тесте должно **точно совпадать** с «Внешним ID» существующего автотеста в библиотеке TMS (часто это длинная hex-строка); иначе адаптер не попадёт в нужную запись при `automaticCreationTestCases=false`.
 
 Если нужно прогнать только mail-тесты:
 

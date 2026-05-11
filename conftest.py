@@ -2,6 +2,7 @@ import time
 
 import pytest
 import requests
+from dotenv import load_dotenv
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
@@ -12,6 +13,8 @@ from models.Subscriptions.model_user_subsriptions import UserSubscriptionRespons
 from resources.user_creds import VerifiedUserCreds
 from utils.data_generator import DataGenerator
 from utils.helpers import DataUtils
+
+load_dotenv()
 
 
 def _session_with_retries() -> requests.Session:
