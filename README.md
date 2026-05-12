@@ -128,15 +128,18 @@ uv run pytest --collect-only
 
 `Integration CI` — `.github/workflows/integration.yml`
 - запускается вручную через `Actions -> Integration (Live) -> Run workflow`
-- запускается автоматически ночью по `schedule`
-- `scope=smoke` запускает `pytest -m "smoke and integration"`
-- `scope=full` и nightly запускают `pytest -m "integration"`
+- запускается автоматически ночью по `schedule` (основной job + отдельный **mail-e2e**)
+- `scope=smoke` запускает `pytest -m "smoke and integration and not ui"` (без Playwright UI)
+- `scope=full` и ночной прогон основного job: `pytest -m "integration and not ui"`
+- `scope=mail`: API `test_email_verification_e2e` + Playwright `test_register_and_verify_email_e2e` с `RUN_MAIL_INTEGRATION=1`, полным хвостом same-email (`REGISTER_SAME_EMAIL_RETRY_MAX_WAIT_SECONDS=120`, poll `4`), `--testit`, `APP_BASE_URL` по умолчанию `https://app.yeatwork.ru`
+- ночной job **mail-e2e** (только `schedule`): те же два теста, что и при `scope=mail`, плюс `MAIL_*` secrets и установка Chromium для Playwright
 - перед тестами выполняется preflight API healthcheck (`/subscriptions` + доступность `/auth/refresh`)
 - после каждого manual/nightly run сохраняются artifacts `allure-results-<run_number>` и `allure-report-<run_number>`
 
 Для `Integration CI` в GitHub Actions должны быть заведены repository secrets:
 - `VERIFIED_USER_EMAIL`
 - `VERIFIED_USER_PASSWORD`
+- для mail / nightly mail-e2e: `MAIL_HOST`, `MAIL_PORT`, `MAIL_EMAIL`, `MAIL_PASSWORD`, `MAIL_FOLDER` (и при использовании Test IT — `TMS_*`, см. workflow)
 
 Artifacts доступны на странице конкретного workflow run в GitHub Actions.
 

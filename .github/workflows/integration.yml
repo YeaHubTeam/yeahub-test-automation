@@ -91,9 +91,15 @@ jobs:
         run: |
           set -euo pipefail
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.scope }}" = "mail" ]; then
-            echo "Running mail IMAP e2e (scope=mail)"
+            echo "Running mail e2e (scope=mail): API verify-email + Playwright register→IMAP→onboarding→delete→same-email"
             export RUN_MAIL_INTEGRATION=1
-            uv run pytest -m "integration and not ui" -q tests/auth/test_auth_verify_email_e2e.py --alluredir=allure-results --testit
+            export REGISTER_SAME_EMAIL_RETRY_MAX_WAIT_SECONDS=120
+            export REGISTER_SAME_EMAIL_RETRY_POLL_INTERVAL_SECONDS=4
+            export APP_BASE_URL="${APP_BASE_URL:-https://app.yeatwork.ru}"
+            uv run pytest -q \
+              tests/auth/test_auth_verify_email_e2e.py::test_email_verification_e2e \
+              tests/ui/auth/test_register_verify_email_e2e.py::test_register_and_verify_email_e2e \
+              --alluredir=allure-results --testit
             exit 0
           fi
 
@@ -140,12 +146,13 @@ jobs:
         run: exit 1
 
   mail-e2e:
-    # Run automatically on schedule to catch critical mail-flow regressions,
-    # but avoid running twice on manual dispatch (scope=mail is handled by the job above).
+    # Nightly: API mail e2e + Playwright UI register→IMAP→onboarding→delete→same-email (full flow, see REGISTER_SAME_EMAIL_*).
+    # Manual scope=mail runs the same tests in integration-tests (this job is schedule-only).
     if: ${{ github.event_name == 'schedule' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     env:
+      CI: "true"
       # Mail (IMAP) secrets for live mail e2e
       MAIL_HOST: ${{ secrets.MAIL_HOST }}
       MAIL_PORT: ${{ secrets.MAIL_PORT }}
@@ -153,6 +160,10 @@ jobs:
       MAIL_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
       MAIL_FOLDER: ${{ secrets.MAIL_FOLDER }}
       RUN_MAIL_INTEGRATION: "1"
+      # Full same-email re-register branch (matches local manual validation; ~120s budget for backend cooldown)
+      REGISTER_SAME_EMAIL_RETRY_MAX_WAIT_SECONDS: "120"
+      REGISTER_SAME_EMAIL_RETRY_POLL_INTERVAL_SECONDS: "4"
+      APP_BASE_URL: "https://app.yeatwork.ru"
       TMS_URL: ${{ secrets.TMS_URL }}
       TMS_PRIVATE_TOKEN: ${{ secrets.TMS_PRIVATE_TOKEN }}
       TMS_PROJECT_ID: ${{ secrets.TMS_PROJECT_ID }}
@@ -183,6 +194,9 @@ jobs:
       - name: Install Allure CLI
         run: npm install -g allure-commandline
 
+      - name: Install Playwright Chromium
+        run: uv run playwright install chromium
+
       - name: Preflight IMAP configuration
         shell: bash
         run: |
@@ -190,7 +204,7 @@ jobs:
           : "${MAIL_HOST:?MAIL_HOST secret is required}"
           : "${MAIL_EMAIL:?MAIL_EMAIL secret is required}"
           : "${MAIL_PASSWORD:?MAIL_PASSWORD secret is required}"
-          echo "Mail secrets are present. Running mail e2e..."
+          echo "Mail secrets are present. Running mail e2e (API + Playwright)..."
 
       - name: Preflight API healthcheck
         shell: bash
@@ -221,7 +235,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          uv run pytest -q tests/auth/test_auth_verify_email_e2e.py -m "integration and not ui" --alluredir=allure-results --testit
+          uv run pytest -q \
+            tests/auth/test_auth_verify_email_e2e.py::test_email_verification_e2e \
+            tests/ui/auth/test_register_verify_email_e2e.py::test_register_and_verify_email_e2e \
+            --alluredir=allure-results --testit
 
       - name: Generate Allure HTML report
         if: ${{ always() }}
