@@ -87,7 +87,7 @@ cp .env.example .env
 - `MAIL_PASSWORD`
 - `MAIL_FOLDER`
 - `RUN_MAIL_INTEGRATION`
-- опционально (повторная регистрация на тот же email после удаления): `REGISTER_SAME_EMAIL_RETRY_MAX_WAIT_SECONDS`, `REGISTER_SAME_EMAIL_RETRY_POLL_INTERVAL_SECONDS`, `REGISTER_SAME_EMAIL_API_PROBE` — см. комментарии в `.env.example`
+- опционально (повторная регистрация на тот же email после удаления): переопределение дефолтов через `REGISTER_SAME_EMAIL_*` — см. `tests/ui/flows/same_email_retry_config.py` и комментарии в `.env.example`
 
 ### Для чего они нужны
 
@@ -131,8 +131,8 @@ uv run pytest --collect-only
 - запускается автоматически ночью по `schedule` (основной job + отдельный **mail-e2e**)
 - `scope=smoke` запускает `pytest -m "smoke and integration and not ui"` (без Playwright UI)
 - `scope=full` и ночной прогон основного job: `pytest -m "integration and not ui"`
-- `scope=mail`: API `test_email_verification_e2e` + Playwright `test_register_and_verify_email_e2e` с `RUN_MAIL_INTEGRATION=1`, полным хвостом same-email (`REGISTER_SAME_EMAIL_RETRY_MAX_WAIT_SECONDS=120`, poll `4`), `--testit`, `APP_BASE_URL` по умолчанию `https://app.yeatwork.ru`
-- ночной job **mail-e2e** (только `schedule`): те же два теста, что и при `scope=mail`, плюс `MAIL_*` secrets и установка Chromium для Playwright
+- `scope=mail`: API `test_email_verification_e2e` + Playwright `test_register_and_verify_email_e2e` + онбординг `test_onboarding_full_flow_e2e` с `RUN_MAIL_INTEGRATION=1`, `--testit`, `APP_BASE_URL` по умолчанию `https://app.yeatwork.ru` (тайминги same-email для регистрационного e2e — дефолты в коде, как при локальном запуске)
+- ночной job **mail-e2e** (только `schedule`): те же три теста, что и при `scope=mail`, плюс `MAIL_*` secrets и установка Chromium для Playwright
 - перед тестами выполняется preflight API healthcheck (`/subscriptions` + доступность `/auth/refresh`)
 - после каждого manual/nightly run сохраняются artifacts `allure-results-<run_number>` и `allure-report-<run_number>`
 
@@ -240,7 +240,7 @@ RUN_MAIL_INTEGRATION=1 uv run pytest -q tests/auth/test_auth_verify_email_e2e.py
 
 ### UI E2E (Playwright): регистрация в браузере → IMAP → онбординг → удаление → опционально тот же email
 
-Отдельный сценарий в `tests/ui/auth/test_register_verify_email_e2e.py`: форма на `/auth/register`, реальный ящик для письма верификации, затем UI-онбординг, удаление аккаунта в настройках и при необходимости вторая регистрация на тот же адрес (см. `REGISTER_SAME_EMAIL_*` в `.env.example` — бэкенд может отвечать `user.user.email.limited_period`).
+Отдельный сценарий в `tests/ui/auth/test_register_verify_email_e2e.py`: форма на `/auth/register`, реальный ящик для письма верификации, затем UI-онбординг, удаление аккаунта в настройках и при необходимости вторая регистрация на тот же адрес (дефолтные тайминги и API-probe — в `tests/ui/flows/same_email_retry_config.py` и `tests/mail/verification_flow.py`; при необходимости переопредели `REGISTER_SAME_EMAIL_*` в `.env` — бэкенд может отвечать `user.user.email.limited_period`).
 
 Пример локального запуска:
 

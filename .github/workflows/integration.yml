@@ -93,12 +93,11 @@ jobs:
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.scope }}" = "mail" ]; then
             echo "Running mail e2e (scope=mail): API verify-email + Playwright register→IMAP→onboarding→delete→same-email"
             export RUN_MAIL_INTEGRATION=1
-            export REGISTER_SAME_EMAIL_RETRY_MAX_WAIT_SECONDS=120
-            export REGISTER_SAME_EMAIL_RETRY_POLL_INTERVAL_SECONDS=4
             export APP_BASE_URL="${APP_BASE_URL:-https://app.yeatwork.ru}"
             uv run pytest -q \
               tests/auth/test_auth_verify_email_e2e.py::test_email_verification_e2e \
               tests/ui/auth/test_register_verify_email_e2e.py::test_register_and_verify_email_e2e \
+              tests/ui/interview/test_onboarding_flow_e2e.py::test_onboarding_full_flow_e2e \
               --alluredir=allure-results --testit
             exit 0
           fi
@@ -146,7 +145,7 @@ jobs:
         run: exit 1
 
   mail-e2e:
-    # Nightly: API mail e2e + Playwright UI register→IMAP→onboarding→delete→same-email (full flow, see REGISTER_SAME_EMAIL_*).
+    # Nightly: API mail e2e + Playwright UI register→IMAP→onboarding→delete→same-email (same-email timing defaults in code).
     # Manual scope=mail runs the same tests in integration-tests (this job is schedule-only).
     if: ${{ github.event_name == 'schedule' }}
     runs-on: ubuntu-latest
@@ -160,9 +159,6 @@ jobs:
       MAIL_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
       MAIL_FOLDER: ${{ secrets.MAIL_FOLDER }}
       RUN_MAIL_INTEGRATION: "1"
-      # Full same-email re-register branch (matches local manual validation; ~120s budget for backend cooldown)
-      REGISTER_SAME_EMAIL_RETRY_MAX_WAIT_SECONDS: "120"
-      REGISTER_SAME_EMAIL_RETRY_POLL_INTERVAL_SECONDS: "4"
       APP_BASE_URL: "https://app.yeatwork.ru"
       TMS_URL: ${{ secrets.TMS_URL }}
       TMS_PRIVATE_TOKEN: ${{ secrets.TMS_PRIVATE_TOKEN }}
@@ -238,6 +234,7 @@ jobs:
           uv run pytest -q \
             tests/auth/test_auth_verify_email_e2e.py::test_email_verification_e2e \
             tests/ui/auth/test_register_verify_email_e2e.py::test_register_and_verify_email_e2e \
+            tests/ui/interview/test_onboarding_flow_e2e.py::test_onboarding_full_flow_e2e \
             --alluredir=allure-results --testit
 
       - name: Generate Allure HTML report

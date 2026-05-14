@@ -159,6 +159,18 @@ def assert_profile_not_verified(api_manager: ApiManager, email: str, password: s
     )
 
 
+def assert_profile_specialization_selected(
+    api_manager: ApiManager, email: str, password: str
+) -> None:
+    """После онбординга в профиле должна быть выбранная специализация (specializationId != 0)."""
+    api_manager.auth_api.authenticate((email, password))
+    profile = api_manager.auth_api.profile().json()
+    profiles = profile.get("profiles") or []
+    assert profiles, "profiles missing in /auth/profile"
+    sid = profiles[0].get("specializationId")
+    assert sid not in (None, 0), f"expected specializationId set after onboarding, got {sid!r}"
+
+
 def delete_authenticated_user_via_api(api_manager: ApiManager, email: str, password: str) -> None:
     """Teardown: удалить пользователя тем же Bearer, что и `registered_user` в conftest."""
     api_manager.auth_api.authenticate((email, password))

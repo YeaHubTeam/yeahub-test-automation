@@ -1,9 +1,6 @@
 import os
-import random
 import re
-import string
 import time
-from datetime import datetime, timezone
 
 import allure
 import pytest
@@ -12,47 +9,24 @@ from playwright.sync_api import Page, expect
 
 from api.api_manager import ApiManager
 from pages.auth.register_page import RegisterPage
-from pages.interview.interview_page import InterviewPage
 from pages.settings.settings_page import SettingsPage
-from resources.mail_creds import MailCreds
 from tests.mail.verification_flow import (
-    assert_profile_not_verified,
-    assert_profile_verified,
     build_signup_payload_for_api,
-    confirm_email_via_link,
     delete_authenticated_user_via_api,
-    profile_user_id,
     same_email_signup_api_probe_enabled,
-    wait_imap_verification_link_or_resend,
     wait_same_email_signup_ready_via_api_probe,
 )
+from tests.ui.flows.register_mail_interview_flow import (
+    new_plus_tagged_email,
+    register_ui_through_interview_first_continue,
+    require_mail_creds,
+    verify_email_via_imap_after_first_onboarding_continue,
+)
+from tests.ui.flows.same_email_retry_config import (
+    same_email_retry_max_wait_seconds,
+    same_email_retry_poll_interval_seconds,
+)
 from utils.data_generator import DataGenerator
-
-
-def _int_env(name: str, default: int = 0) -> int:
-    raw = os.getenv(name, str(default) if default else "").strip()
-    if raw == "":
-        return default
-    try:
-        return max(0, int(raw))
-    except ValueError:
-        return default
-
-
-def _same_email_retry_max_wait_s() -> int:
-    """Общий бюджет времени; явный MAX_WAIT или legacy REGISTER_SAME_EMAIL_RETRY_AFTER_SECONDS."""
-    if os.getenv("REGISTER_SAME_EMAIL_RETRY_MAX_WAIT_SECONDS", "").strip() != "":
-        return _int_env("REGISTER_SAME_EMAIL_RETRY_MAX_WAIT_SECONDS", 0)
-    return _int_env("REGISTER_SAME_EMAIL_RETRY_AFTER_SECONDS", 0)
-
-
-def _same_email_retry_poll_interval_s() -> float:
-    raw = os.getenv("REGISTER_SAME_EMAIL_RETRY_POLL_INTERVAL_SECONDS", "4").strip()
-    try:
-        v = float(raw.replace(",", "."))
-    except ValueError:
-        v = 4.0
-    return min(5.0, max(3.0, v))
 
 
 def _wait_same_email_cooldown(page: Page, total_s: int, poll_s: float) -> None:
@@ -105,61 +79,30 @@ def test_register_page_opens(page: Page):
 )
 def test_register_and_verify_email_e2e(page: Page, api_manager: ApiManager):
     with allure.step("Preconditions: mail creds configured"):
-        assert MailCreds.EMAIL and MailCreds.PASSWORD and MailCreds.HOST, (
-            "Mail creds are not configured. Set MAIL_HOST/MAIL_EMAIL/MAIL_PASSWORD."
-        )
+        require_mail_creds()
 
-    started_at = datetime.now(timezone.utc)
-    inbox_email = MailCreds.EMAIL
-    local, domain = inbox_email.split("@", 1)
-    suffix = "".join(random.choices(string.ascii_lowercase + string.digits, k=4))
-    tag = f"e2e-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}-{suffix}"
-    recipient_email = f"{local}+{tag}@{domain}"
-
-    password = DataGenerator.random_password()
-    username = DataGenerator.random_username()
+    started_at, _tag, recipient_email, password, username = new_plus_tagged_email()
 
     with allure.step("Register new user via UI"):
-        register_page = RegisterPage(page)
-        register_page.open()
-        expect(page).to_have_url(re.compile(r".*/auth/register$"))
-
-        register_page.fill_register_form(username, recipient_email, password)
-        register_page.check_checkboxes()
-        register_page.submit_registration()
-        register_page.wait_after_successful_register()
-
-    interview_page = InterviewPage(page)
-    with allure.step("Onboarding: open and continue first step"):
-        interview_page.onboarding.expect_onboarding_visible()
-        interview_page.onboarding.click_continue()
-
-    # API: тот же email/password — authenticate() сам кладёт Bearer в session requests (без токена из браузера).
-    with allure.step("API: verify profile is NOT verified yet"):
-        assert_profile_not_verified(api_manager, recipient_email, password)
-
-    with allure.step("IMAP: fetch verification email (or resend)"):
-        profile = api_manager.auth_api.profile().json()
-        user_id = profile_user_id(profile)
-        verification_url = wait_imap_verification_link_or_resend(
-            api_manager,
-            user_id=user_id,
-            recipient_email=recipient_email,
-            since=started_at,
+        interview_page = register_ui_through_interview_first_continue(
+            page,
+            username,
+            recipient_email,
+            password,
         )
 
-    with allure.step("Confirm email via verification link"):
-        confirm_email_via_link(verification_url)
-        assert_profile_verified(api_manager, recipient_email, password)
+    with allure.step("API + IMAP: verify email (см. register_mail_interview_flow)"):
+        verify_email_via_imap_after_first_onboarding_continue(
+            api_manager,
+            recipient_email=recipient_email,
+            password=password,
+            started_at=started_at,
+        )
 
-    # Постусловие ТК: настройки → аккаунт → удаление → редирект на регистрацию.
-    # Повторная регистрация с тем же email: по умолчанию бэкенд сразу отвечает limited_period
-    # (см. tests/api/test_send_verification_email.py) — проверяем тост.
-    # Повторный signup: REGISTER_SAME_EMAIL_RETRY_MAX_WAIT_SECONDS (или legacy *_AFTER_SECONDS) —
-    # только ожидание нарезкой REGISTER_SAME_EMAIL_RETRY_POLL_INTERVAL_SECONDS, затем один submit (без цикла submit).
-    # После успеха — delete_authenticated_user_via_api.
-    same_email_retry_max_s = _same_email_retry_max_wait_s()
-    same_email_poll_s = _same_email_retry_poll_interval_s()
+    # Повторная регистрация на тот же email: дефолты 120 с / poll 4 с / API probe — tests/ui/flows/same_email_retry_config.py
+    # Быстрый путь (только тост): REGISTER_SAME_EMAIL_RETRY_MAX_WAIT_SECONDS=0
+    same_email_retry_max_s = same_email_retry_max_wait_seconds()
+    same_email_poll_s = same_email_retry_poll_interval_seconds()
 
     with allure.step("Complete onboarding and delete account via UI"):
         interview_page.onboarding.complete_onboarding_through_close()
