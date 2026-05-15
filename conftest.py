@@ -62,7 +62,9 @@ def test_user():
         "city": DataGenerator.random_city(),
         "birthday": DataGenerator.random_birthday(),
         "address": DataGenerator.random_address(),
-        "avatarUrl": DataGenerator.random_avatar_url(),
+        # Без внешнего URL: бэкенд при delete_user иначе может дергать storage и отвечать
+        # storage.image.not_found (faker image_url / placekitten и т.п.).
+        "avatarUrl": None,
     }
 
 
@@ -93,8 +95,7 @@ def registered_user(api_manager, test_user):
     ):  # Проверяем что пользоватпель не залогинен
         # Так как чтоб удалить пользователя нужно залогинется
         api_manager.auth_api.authenticate((test_user["email"], test_user["password"]))
-    api_manager.user_api.delete_user(test_user["id"], expected_status=[404, 401])
-    # TODO поменять ожидаемый сатус код в teardown в методе "delete_user" на 200 после исправления бага
+    api_manager.user_api.delete_user(test_user["id"], expected_status=[200, 404, 401])
 
 
 @pytest.fixture

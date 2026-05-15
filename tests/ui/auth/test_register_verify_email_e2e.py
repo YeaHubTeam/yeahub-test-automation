@@ -46,6 +46,7 @@ def _wait_same_email_cooldown(page: Page, total_s: int, poll_s: float) -> None:
 
 
 @pytest.mark.ui
+@pytest.mark.integration
 @pytest.mark.smoke
 @allure.epic("UI")
 @allure.feature("Auth")

@@ -130,7 +130,9 @@ uv run pytest --collect-only
 - запускается вручную через `Actions -> Integration (Live) -> Run workflow`
 - запускается автоматически ночью по `schedule` (основной job + отдельный **mail-e2e**)
 - `scope=smoke` запускает `pytest -m "smoke and integration and not ui"` (без Playwright UI)
-- `scope=full` и ночной прогон основного job: `pytest -m "integration and not ui"`
+- `scope=full` и ночной прогон (`schedule`) основного job: `pytest -m "integration and not ui"`, затем UI auth smoke (login ТК 409 + register page) и UI payment (если заданы `VERIFIED_USER_*`)
+- `scope=ui-auth`: Playwright auth smoke — `test_login_email_desktop` (ТК 409, шаги 1–4) + `test_register_page_opens` (`--testit`, `APP_BASE_URL` по умолчанию `https://app.yeatwork.ru`)
+- `scope=ui-payment`: Playwright `tests/ui/subscription/test_subscription_payment_ui.py` (нужны secrets `VERIFIED_USER_EMAIL`, `VERIFIED_USER_PASSWORD`)
 - `scope=mail`: API `test_email_verification_e2e` + Playwright `test_register_and_verify_email_e2e` + онбординг `test_onboarding_full_flow_e2e` с `RUN_MAIL_INTEGRATION=1`, `--testit`, `APP_BASE_URL` по умолчанию `https://app.yeatwork.ru` (тайминги same-email для регистрационного e2e — дефолты в коде, как при локальном запуске)
 - ночной job **mail-e2e** (только `schedule`): те же три теста, что и при `scope=mail`, плюс `MAIL_*` secrets и установка Chromium для Playwright
 - перед тестами выполняется preflight API healthcheck (`/subscriptions` + доступность `/auth/refresh`)
@@ -161,6 +163,7 @@ Artifacts доступны на странице конкретного workflow
 - `smoke and integration` - live smoke на реальном стенде
 - `integration` - полный live integration контур
 - `unit or pr_safe` - стабильный контур для Fast CI
+- явные пути UI в Integration CI (`scope=ui-auth`, `scope=ui-payment`, ночной `schedule`, `scope=full`) — не через `-m ui`, чтобы не затянуть mail e2e и нестабильные сценарии
 
 Важно:
 - `smoke` и `integration` не исключают друг друга
@@ -237,6 +240,36 @@ MAIL_PASSWORD=<app_password>
 ```bash
 RUN_MAIL_INTEGRATION=1 uv run pytest -q tests/auth/test_auth_verify_email_e2e.py -m "not ui"
 ```
+
+### UI E2E (Playwright): вход по email и паролю (desktop, ТК 409)
+
+Автотест `tests/ui/auth/test_login_email_desktop.py` — ручной кейс [409](https://team-vz1y.testit.software/browse/409), **шаги 1–4**: форма `/auth/login`, ввод email/пароля, «Вход», переход на `/interview`. Пользователь создаётся через API (`registered_user`), в teardown удаляется (`delete_user`). Постусловие «Выйти» через UI в этом тесте **не** автоматизировано (см. onboarding e2e / `tests/auth/test_auth_logout.py`).
+
+Локальный запуск:
+
+```bash
+uv run pytest tests/ui/auth/test_login_email_desktop.py::test_login_with_email_and_password_desktop -v
+```
+
+С браузером: `--headed`. Test IT: `--testit` и `TMS_*` в `.env` (см. `pyproject.toml`, `[testit]`). `externalId` в коде: `yeahub-ui-auth-login-email-password-desktop-409`.
+
+CI (Integration workflow, scope `ui-auth` или ночной `schedule` / `scope=full` после API): см. [CI Strategy](#ci-strategy).
+
+В том же scope `ui-auth` дополнительно гоняется лёгкий smoke «открылась страница регистрации»:
+
+```bash
+uv run pytest tests/ui/auth/test_register_verify_email_e2e.py::test_register_page_opens -v
+```
+
+### UI E2E (Playwright): оплата подписки (T-Bank)
+
+`tests/ui/subscription/test_subscription_payment_ui.py` — UI оплаты по ссылке из API (`static_user` / `VERIFIED_USER_*` в secrets).
+
+```bash
+uv run pytest tests/ui/subscription/test_subscription_payment_ui.py -v
+```
+
+CI: Integration workflow, scope `ui-payment` (или ночной `schedule` / `scope=full` после auth smoke, если заданы `VERIFIED_USER_*`).
 
 ### UI E2E (Playwright): регистрация в браузере → IMAP → онбординг → удаление → опционально тот же email
 

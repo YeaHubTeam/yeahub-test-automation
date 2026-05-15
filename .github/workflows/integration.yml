@@ -12,6 +12,8 @@ on:
           - smoke
           - full
           - mail
+          - ui-auth
+          - ui-payment
   schedule:
     - cron: "0 2 * * *"
 
@@ -90,6 +92,28 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+
+          run_ui_auth_smoke() {
+            echo "UI auth smoke: login TC 409 + register page opens"
+            export APP_BASE_URL="${APP_BASE_URL:-https://app.yeatwork.ru}"
+            export CI=true
+            uv run pytest -q \
+              tests/ui/auth/test_login_email_desktop.py::test_login_with_email_and_password_desktop \
+              tests/ui/auth/test_register_verify_email_e2e.py::test_register_page_opens \
+              --alluredir=allure-results --testit
+          }
+
+          run_ui_payment() {
+            echo "UI payment: T-Bank subscription checkout (requires VERIFIED_USER_* secrets)"
+            : "${VERIFIED_USER_EMAIL:?VERIFIED_USER_EMAIL secret is required for ui-payment}"
+            : "${VERIFIED_USER_PASSWORD:?VERIFIED_USER_PASSWORD secret is required for ui-payment}"
+            export APP_BASE_URL="${APP_BASE_URL:-https://app.yeatwork.ru}"
+            export CI=true
+            uv run pytest -q \
+              tests/ui/subscription/test_subscription_payment_ui.py \
+              --alluredir=allure-results --testit
+          }
+
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.scope }}" = "mail" ]; then
             echo "Running mail e2e (scope=mail): API verify-email + Playwright register→IMAP→onboarding→delete→same-email"
             export RUN_MAIL_INTEGRATION=1
@@ -102,6 +126,16 @@ jobs:
             exit 0
           fi
 
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.scope }}" = "ui-auth" ]; then
+            run_ui_auth_smoke
+            exit 0
+          fi
+
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.scope }}" = "ui-payment" ]; then
+            run_ui_payment
+            exit 0
+          fi
+
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.scope }}" = "smoke" ]; then
             MARK_EXPR="smoke and integration and not ui"
           else
@@ -109,6 +143,22 @@ jobs:
           fi
           echo "Running pytest with marker expression: ${MARK_EXPR}"
           uv run pytest -m "${MARK_EXPR}" --alluredir=allure-results --testit
+
+          RUN_UI_AFTER_API=false
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            RUN_UI_AFTER_API=true
+          fi
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.scope }}" = "full" ]; then
+            RUN_UI_AFTER_API=true
+          fi
+          if [ "${RUN_UI_AFTER_API}" = "true" ]; then
+            run_ui_auth_smoke
+            if [ -n "${VERIFIED_USER_EMAIL:-}" ] && [ -n "${VERIFIED_USER_PASSWORD:-}" ]; then
+              run_ui_payment
+            else
+              echo "Skipping UI payment: VERIFIED_USER_EMAIL / VERIFIED_USER_PASSWORD not set"
+            fi
+          fi
 
       - name: Generate Allure HTML report
         if: ${{ always() }}

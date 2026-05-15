@@ -9,6 +9,8 @@
 ## Как проверить
 - `pytest tests/path/to/tests/`
 - `pytest -m "smoke and api"`
+- UI auth smoke: `uv run pytest tests/ui/auth/test_login_email_desktop.py tests/ui/auth/test_register_verify_email_e2e.py::test_register_page_opens -v`
+- UI payment: `uv run pytest tests/ui/subscription/test_subscription_payment_ui.py -v` (нужны `VERIFIED_USER_*`)
 
 ## Чеклист
 - [ ] Линтер пройден (`ruff check .` и `ruff format --check .`)

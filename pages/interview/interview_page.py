@@ -16,6 +16,12 @@ class InterviewPage:
     def expect_on_interview_route(self) -> None:
         expect(self.page).to_have_url(INTERVIEW_URL_RE)
 
+    def expect_authorized_after_login(self, *, username: str) -> None:
+        """Шаг 4 ТК 409: редирект на interview и признак активной сессии (имя в шапке)."""
+        self.expect_on_interview_route()
+        expect(self.page).not_to_have_url(re.compile(r".*/auth/login", re.I), timeout=5_000)
+        expect(self.page.get_by_text(username).first).to_be_visible(timeout=15_000)
+
     def open_interview(self) -> None:
         self.page.goto("/interview", wait_until="domcontentloaded", timeout=60_000)
         self.expect_on_interview_route()

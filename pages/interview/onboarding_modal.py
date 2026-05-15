@@ -6,7 +6,10 @@ from playwright.sync_api import expect
 class OnboardingModal:
     def __init__(self, page):
         self.page = page
-        self._modal = page.locator('[data-testid="Modal"]').filter(has_text="Onboarding")
+        # Только `has_text="Onboarding"` ломается на флаке (тайминг/DOM) — stepper стабильнее для всех шагов 1–5.
+        self._modal = page.locator('[data-testid="Modal"]').filter(
+            has=page.get_by_test_id("stepper")
+        )
 
     @property
     def modal(self):
@@ -14,7 +17,10 @@ class OnboardingModal:
 
     @property
     def continue_btn(self):
-        return self.modal.get_by_role("button", name="Продолжить")
+        return self.modal.get_by_role(
+            "button",
+            name=re.compile(r"^\s*Продолжить\s*$|^\s*Continue\s*$", re.I),
+        )
 
     @property
     def save_and_continue_btn(self):
@@ -193,12 +199,17 @@ class OnboardingModal:
             self.page.keyboard.press("Escape")
 
     def complete_onboarding_through_close(self) -> None:
-        """Шаги 2–5: специализация → … → финал; крестик на последнем шаге.
+        """Шаги 1–5: при необходимости «Продолжить» на 1/5 → далее 2–5 и закрытие.
 
         После долгого API/IMAP UI может остаться на 2-м шаге или уже уйти на 3+,
         поэтому каждый шаг выполняется только если виден его маркер.
+        Прямой вход на /interview (например API signUp + UI login) часто оставляет шаг 1/5 открытым.
         """
         expect(self.modal).to_be_visible(timeout=10_000)
+
+        progress_1 = self.modal.get_by_text(re.compile(r"1\s*/\s*5|1\s+of\s+5", re.I)).first
+        if progress_1.is_visible(timeout=3_000) and self.continue_btn.is_visible(timeout=2_000):
+            self.click_continue()
 
         if self.modal.get_by_test_id("dropdown-select").is_visible(timeout=5_000):
             self.open_drop_down_and_choose_specialization()
@@ -217,9 +228,20 @@ class OnboardingModal:
         if self.later_btn.is_visible(timeout=8_000):
             self.click_later_btn()
 
-        # Финальный экран: «5/5» и текст про YeaHub — два <p>; or_() даёт strict mode (2 элемента).
-        expect(self.modal.get_by_text(re.compile(r"благодаря\s+вам", re.I)).first).to_be_visible(
-            timeout=25_000
-        )
+        # Финал 5/5: прогресс обязателен; копирайт — как в expect_onboarding_fifth_step_visible
+        # (на стенде не всегда есть строка «благодаря вам»; с --testit бывает задержка гидрации).
+        expect(
+            self.modal.get_by_text(re.compile(r"5\s*/\s*5|5\s+of\s+5", re.I)).first
+        ).to_be_visible(timeout=25_000)
+        final_copy = self.modal.get_by_text(
+            re.compile(
+                r"YeaHub\s+становится\s+лучше|благодаря\s+вам|становится\s+лучше",
+                re.I,
+            )
+        ).first
+        if not final_copy.is_visible(timeout=3_000):
+            expect(self.close_icon).to_be_visible(timeout=12_000)
+        else:
+            expect(final_copy).to_be_visible(timeout=15_000)
         self.close_onboarding_modal()
         expect(self.modal).to_be_hidden(timeout=25_000)

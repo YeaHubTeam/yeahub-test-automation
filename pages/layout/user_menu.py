@@ -2,6 +2,8 @@ import re
 
 from playwright.sync_api import expect
 
+from pages.interview.onboarding_modal import OnboardingModal
+
 
 class UserMenu:
     """Шапка: меню пользователя и быстрый переход в настройки."""
@@ -11,24 +13,73 @@ class UserMenu:
 
     def _profile_menu_trigger(self):
         """Кнопка с аватаром, открывающая меню (dialog/popover)."""
-        return self.page.locator('button[aria-haspopup="dialog"]').filter(
+        by_stub = self.page.locator('button[aria-haspopup="dialog"]').filter(
             has=self.page.get_by_test_id("AvatarWithoutPhoto_Wrapper")
         )
+        if by_stub.count() > 0:
+            return by_stub
+        # Без заглушки «без фото» — ищем dialog-триггер в шапке (не `.first` по всей странице: там онбординг).
+        header = self.page.locator("header")
+        if header.count():
+            return header.locator('button[aria-haspopup="dialog"]').last
+        nav = self.page.locator("nav")
+        if nav.count():
+            return nav.locator('button[aria-haspopup="dialog"]').last
+        return self.page.locator('button[aria-haspopup="dialog"]').last
 
-    def _profile_menu_trigger_loose(self):
-        """Запасной триггер: кнопка с popover/menu в шапке (иногда без AvatarWithoutPhoto_Wrapper)."""
-        return self.page.locator(
-            'button[aria-haspopup="dialog"], button[aria-haspopup="menu"]'
-        ).first
+    def _dismiss_modal_overlay_blocking_header(self) -> None:
+        """Снять `Modal_Overlay`, чтобы клик по аватару дошёл до цели.
+
+        Не используем Escape и клик по оверлею: на онбординге (особенно 2/5) это даёт
+        валидацию «Специализация не выбрана» и лавину тостов — только штатный проход
+        `complete_onboarding_through_close`.
+
+        На /interview оверлей и Modal иногда монтируются после редиректа (TestIT, CI) —
+        не выходим сразу при `Modal_Overlay` count=0, а коротко поллим.
+        """
+        onboarding = OnboardingModal(self.page)
+        interview = "interview" in self.page.url.lower()
+        max_rounds = 24 if interview else 4
+        saw_overlay_in_dom = False
+
+        for i in range(max_rounds):
+            overlay_root = self.page.get_by_test_id("Modal_Overlay")
+            if overlay_root.count():
+                saw_overlay_in_dom = True
+
+            if onboarding.modal.is_visible(timeout=600):
+                onboarding.complete_onboarding_through_close()
+                return
+
+            if overlay_root.count() and overlay_root.first.is_visible(timeout=600):
+                if onboarding.modal.is_visible(timeout=12_000):
+                    onboarding.complete_onboarding_through_close()
+                    return
+                msg = (
+                    "Modal overlay is visible but onboarding modal (Modal + stepper) was not found; "
+                    "update locators or timeouts."
+                )
+                raise RuntimeError(msg)
+
+            if not interview:
+                return
+            if interview and not saw_overlay_in_dom and i >= 12:
+                return
+            self.page.wait_for_timeout(350)
+
+        overlay_root = self.page.get_by_test_id("Modal_Overlay")
+        if overlay_root.count() and overlay_root.first.is_visible(timeout=400):
+            msg = (
+                "Modal overlay still visible after waiting for onboarding; "
+                "UI may be slower than poll budget — increase max_rounds or fix hydration."
+            )
+            raise RuntimeError(msg)
 
     def open_profile_menu(self) -> None:
+        self._dismiss_modal_overlay_blocking_header()
         trigger = self._profile_menu_trigger()
-        if trigger.is_visible(timeout=3_000):
-            trigger.click()
-        else:
-            loose = self._profile_menu_trigger_loose()
-            expect(loose).to_be_visible(timeout=10_000)
-            loose.click()
+        expect(trigger).to_be_visible(timeout=12_000)
+        trigger.click()
 
     def open_settings_via_profile_menu(self) -> None:
         """Меню профиля → пункт «Настройки» → /settings."""
