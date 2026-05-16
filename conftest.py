@@ -11,10 +11,39 @@ from models.auth_model import AuthModel
 from models.Subscriptions.model_subscription import ModelSubscriptionResponse
 from models.Subscriptions.model_user_subsriptions import UserSubscriptionResponse
 from resources.user_creds import VerifiedUserCreds
+from tests.mail.verification_flow import profile_user_id, verify_api_registered_user_email
+from tests.ui.flows.register_mail_interview_flow import new_plus_tagged_email, require_mail_creds
 from utils.data_generator import DataGenerator
 from utils.helpers import DataUtils
 
 load_dotenv()
+
+
+def _delete_user_try_passwords(
+    api_manager: ApiManager,
+    *,
+    email: str,
+    user_id: str | None,
+    password: str,
+    active_password: str | None = None,
+) -> None:
+    """Teardown: login с active_password (если меняли) или исходным паролем → delete_user."""
+    if not user_id:
+        return
+    candidates: list[str] = []
+    for pwd in (active_password, password):
+        if pwd and pwd not in candidates:
+            candidates.append(pwd)
+    for pwd in candidates:
+        try:
+            api_manager.auth_api.authenticate((email, pwd))
+        except ValueError:
+            continue
+        delete_resp = api_manager.user_api.delete_user(
+            user_id, expected_status=[200, 204, 404, 401]
+        )
+        if delete_resp.status_code in (200, 204, 404):
+            return
 
 
 def _session_with_retries() -> requests.Session:
@@ -90,12 +119,61 @@ def registered_user(api_manager, test_user):
     test_user["id"] = last_response.json().get("user", {}).get("id")
     test_user["token"] = last_response.json().get("access_token")
     yield test_user
-    if (
-        "Authorization" not in api_manager.auth_api.headers
-    ):  # Проверяем что пользоватпель не залогинен
-        # Так как чтоб удалить пользователя нужно залогинется
-        api_manager.auth_api.authenticate((test_user["email"], test_user["password"]))
-    api_manager.user_api.delete_user(test_user["id"], expected_status=[200, 404, 401])
+    _delete_user_try_passwords(
+        api_manager,
+        email=test_user["email"],
+        user_id=test_user.get("id"),
+        password=test_user["password"],
+        active_password=test_user.get("active_password"),
+    )
+
+
+@pytest.fixture
+def verified_registered_user(api_manager, test_user):
+    """signUp → IMAP verify → teardown delete. Для mail/UI с `isVerified=true` (не для TC 113).
+
+    Email — `local+tag@domain` на MAIL_EMAIL (иначе IMAP не найдёт письмо верификации).
+    """
+    require_mail_creds()
+    started_at, _tag, recipient_email, password, username = new_plus_tagged_email()
+    test_user["email"] = recipient_email
+    test_user["password"] = password
+    test_user["username"] = username
+    last_response = None
+    for attempt in range(5):
+        last_response = api_manager.auth_api.register_user(
+            test_user, expected_status=[201, 503, 409]
+        )
+        if last_response.status_code == 201:
+            break
+        started_at, _tag, recipient_email, password, username = new_plus_tagged_email()
+        test_user["email"] = recipient_email
+        test_user["password"] = password
+        test_user["username"] = username
+        time.sleep(2 * (attempt + 1))
+
+    assert last_response is not None
+    assert last_response.status_code == 201, "signUp is unavailable (503) after retries"
+
+    test_user["id"] = last_response.json().get("user", {}).get("id")
+    test_user["token"] = last_response.json().get("access_token")
+    api_manager.auth_api.authenticate((test_user["email"], test_user["password"]))
+    user_id = profile_user_id(api_manager.auth_api.profile().json())
+    verify_api_registered_user_email(
+        api_manager,
+        email=test_user["email"],
+        password=test_user["password"],
+        user_id=user_id,
+        started_at=started_at,
+    )
+    yield test_user
+    _delete_user_try_passwords(
+        api_manager,
+        email=test_user["email"],
+        user_id=test_user.get("id"),
+        password=test_user["password"],
+        active_password=test_user.get("active_password"),
+    )
 
 
 @pytest.fixture

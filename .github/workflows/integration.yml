@@ -100,6 +100,7 @@ jobs:
             uv run pytest -q \
               tests/ui/auth/test_login_email_desktop.py::test_login_with_email_and_password_desktop \
               tests/ui/auth/test_register_verify_email_e2e.py::test_register_page_opens \
+              tests/ui/settings/test_change_password_desktop.py::test_change_password_settings_desktop \
               --alluredir=allure-results --testit
           }
 

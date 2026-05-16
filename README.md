@@ -130,8 +130,8 @@ uv run pytest --collect-only
 - запускается вручную через `Actions -> Integration (Live) -> Run workflow`
 - запускается автоматически ночью по `schedule` (основной job + отдельный **mail-e2e**)
 - `scope=smoke` запускает `pytest -m "smoke and integration and not ui"` (без Playwright UI)
-- `scope=full` и ночной прогон (`schedule`) основного job: `pytest -m "integration and not ui"`, затем UI auth smoke (login ТК 409 + register page) и UI payment (если заданы `VERIFIED_USER_*`)
-- `scope=ui-auth`: Playwright auth smoke — `test_login_email_desktop` (ТК 409, шаги 1–4) + `test_register_page_opens` (`--testit`, `APP_BASE_URL` по умолчанию `https://app.yeatwork.ru`)
+- `scope=full` и ночной прогон (`schedule`) основного job: `pytest -m "integration and not ui"`, затем UI auth smoke (login ТК 409, register page, смена пароля ТК 113) и UI payment (если заданы `VERIFIED_USER_*`)
+- `scope=ui-auth`: Playwright auth/settings smoke — `test_login_email_desktop` (ТК 409), `test_register_page_opens`, `test_change_password_settings_desktop` (ТК 113; `registered_user`, без IMAP) (`--testit`, `APP_BASE_URL` по умолчанию `https://app.yeatwork.ru`)
 - `scope=ui-payment`: Playwright `tests/ui/subscription/test_subscription_payment_ui.py` (нужны secrets `VERIFIED_USER_EMAIL`, `VERIFIED_USER_PASSWORD`)
 - `scope=mail`: API `test_email_verification_e2e` + Playwright `test_register_and_verify_email_e2e` + онбординг `test_onboarding_full_flow_e2e` с `RUN_MAIL_INTEGRATION=1`, `--testit`, `APP_BASE_URL` по умолчанию `https://app.yeatwork.ru` (тайминги same-email для регистрационного e2e — дефолты в коде, как при локальном запуске)
 - ночной job **mail-e2e** (только `schedule`): те же три теста, что и при `scope=mail`, плюс `MAIL_*` secrets и установка Chromium для Playwright
@@ -180,7 +180,7 @@ Artifacts доступны на странице конкретного workflow
 - письмо может вообще не дойти до тестового ящика
 - integration-тест не запускается автоматически
 - такой тест лучше использовать как ручную live-проверку
-- mail credentials сейчас не прокидываются в GitHub Actions: до появления постоянного рабочего mailbox mail flow остается локальным ручным сценарием через `.env`
+- для CI mail flow: nightly job **mail-e2e** и manual `scope=mail` в Integration workflow (нужны secrets `MAIL_*`); локально — `.env` и `RUN_MAIL_INTEGRATION=1`
 
 ### Smoke: проверка IMAP-клиента и парсинга ссылки
 
@@ -260,6 +260,16 @@ CI (Integration workflow, scope `ui-auth` или ночной `schedule` / `scop
 ```bash
 uv run pytest tests/ui/auth/test_register_verify_email_e2e.py::test_register_page_opens -v
 ```
+
+### UI E2E (Playwright): смена пароля в настройках (desktop, ТК 113)
+
+Автотест `tests/ui/settings/test_change_password_desktop.py` — [113](https://team-vz1y.testit.software/browse/113): `/settings#change-password`, смена пароля, logout, вход с новым паролем. Пользователь: API `registered_user` (верификация email **не** требуется), teardown — `delete_user` с актуальным паролем.
+
+```bash
+uv run pytest tests/ui/settings/test_change_password_desktop.py::test_change_password_settings_desktop -v
+```
+
+С браузером: `--headed`. Test IT: `--testit`, `externalId`: `yeahub-ui-settings-change-password-desktop-113`. CI: тот же `scope=ui-auth`, что login 409.
 
 ### UI E2E (Playwright): оплата подписки (T-Bank)
 

@@ -182,14 +182,13 @@ class OnboardingModal:
                 pass
 
         icon = self.close_icon
-        icon.scroll_into_view_if_needed()
-        icon.wait_for(state="visible", timeout=15_000)
-        icon.click(timeout=10_000, force=True)
-        try:
-            expect(self.modal).to_be_hidden(timeout=5_000)
-            return
-        except AssertionError:
-            pass
+        if icon.is_visible(timeout=3_000):
+            icon.click(timeout=10_000, force=True)
+            try:
+                expect(self.modal).to_be_hidden(timeout=5_000)
+                return
+            except AssertionError:
+                pass
 
         self.page.keyboard.press("Escape")
         try:
@@ -228,20 +227,38 @@ class OnboardingModal:
         if self.later_btn.is_visible(timeout=8_000):
             self.click_later_btn()
 
-        # Финал 5/5: прогресс обязателен; копирайт — как в expect_onboarding_fifth_step_visible
-        # (на стенде не всегда есть строка «благодаря вам»; с --testit бывает задержка гидрации).
-        expect(
-            self.modal.get_by_text(re.compile(r"5\s*/\s*5|5\s+of\s+5", re.I)).first
-        ).to_be_visible(timeout=25_000)
-        final_copy = self.modal.get_by_text(
-            re.compile(
-                r"YeaHub\s+становится\s+лучше|благодаря\s+вам|становится\s+лучше",
-                re.I,
-            )
-        ).first
-        if not final_copy.is_visible(timeout=3_000):
-            expect(self.close_icon).to_be_visible(timeout=12_000)
-        else:
-            expect(final_copy).to_be_visible(timeout=15_000)
+        # После «Позже» модалка может сразу закрыться, перейти на 5/5 или остаться на 4/5.
+        try:
+            expect(self.modal).to_be_hidden(timeout=5_000)
+            return
+        except AssertionError:
+            pass
+
+        progress_5 = self.modal.get_by_text(re.compile(r"5\s*/\s*5|5\s+of\s+5", re.I)).first
+        if progress_5.is_visible(timeout=10_000):
+            final_copy = self.modal.get_by_text(
+                re.compile(
+                    r"YeaHub\s+становится\s+лучше|благодаря\s+вам|становится\s+лучше",
+                    re.I,
+                )
+            ).first
+            if not final_copy.is_visible(timeout=3_000):
+                expect(self.close_icon).to_be_visible(timeout=12_000)
+            else:
+                expect(final_copy).to_be_visible(timeout=15_000)
+
         self.close_onboarding_modal()
         expect(self.modal).to_be_hidden(timeout=25_000)
+
+    def try_dismiss_with_escape(self, *, presses: int = 3) -> bool:
+        """Быстрый путь: Escape, если модалка не обязательна к прохождению всех шагов."""
+        for _ in range(presses):
+            if not self.modal.is_visible(timeout=400):
+                return True
+            self.page.keyboard.press("Escape")
+            try:
+                expect(self.modal).to_be_hidden(timeout=2_500)
+                return True
+            except AssertionError:
+                pass
+        return not self.modal.is_visible(timeout=400)

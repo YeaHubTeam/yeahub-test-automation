@@ -1,6 +1,7 @@
 """Общие шаги: отправка письма верификации (с ретраями на rate limit) и подтверждение по ссылке."""
 
 import json
+import logging
 import os
 import re
 import time
@@ -15,6 +16,8 @@ from constants.constants import BASE_URL
 from mail.exceptions import MessageNotFoundError
 from mail.mail_client import MailClient
 from resources.mail_creds import MailCreds
+
+logger = logging.getLogger(__name__)
 
 _EMAIL_RATE_LIMIT_RE = re.compile(
     r"restricted in a period of\s+(?P<seconds>[\d.]+)\s+seconds", re.I
@@ -149,6 +152,52 @@ def assert_profile_verified(api_manager: ApiManager, email: str, password: str) 
     api_manager.auth_api.authenticate((email, password))
     profile = api_manager.auth_api.profile().json()
     assert profile_is_verified(profile), "User email is not verified after verification link"
+
+
+def verify_api_registered_user_email(
+    api_manager: ApiManager,
+    *,
+    email: str,
+    password: str,
+    user_id: str,
+    started_at: datetime,
+    imap_first_timeout_s: float = 20.0,
+    imap_after_resend_timeout_s: float = 120.0,
+) -> None:
+    """После POST /auth/signUp: IMAP (письмо могло уйти на signUp) → иначе send → IMAP → confirm."""
+    assert_profile_not_verified(api_manager, email, password)
+    logger.info(
+        "IMAP first (%.0fs): check if signUp already sent verification email to %s",
+        imap_first_timeout_s,
+        email,
+    )
+    try:
+        verification_url = wait_imap_verification_link(
+            recipient_email=email,
+            since=started_at,
+            timeout_s=imap_first_timeout_s,
+        )
+        logger.info("Verification email found in IMAP without send-verification-email API")
+    except MessageNotFoundError:
+        logger.info(
+            "No email in IMAP after %.0fs — send-verification-email for %s (user_id=%s)",
+            imap_first_timeout_s,
+            email,
+            user_id,
+        )
+        send_verification_email_with_retries(api_manager, user_id)
+        logger.info(
+            "Waiting for Verify Your Email in IMAP for %s (timeout %.0fs)...",
+            email,
+            imap_after_resend_timeout_s,
+        )
+        verification_url = wait_imap_verification_link(
+            recipient_email=email,
+            since=started_at,
+            timeout_s=imap_after_resend_timeout_s,
+        )
+    confirm_email_via_link(verification_url)
+    assert_profile_verified(api_manager, email, password)
 
 
 def assert_profile_not_verified(api_manager: ApiManager, email: str, password: str) -> None:
