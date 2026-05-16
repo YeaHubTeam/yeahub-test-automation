@@ -235,11 +235,16 @@ MAIL_PASSWORD=<app_password>
 - backend может ограничивать частоту отправки verification email (например, не чаще ~1 раза в 60 секунд) — тест e2e умеет ждать и повторять отправку
 - после извлечения ссылки тест удаляет письмо из ящика, чтобы следующий прогон не цеплял старые письма
 
-Запуск e2e (API-контур, без браузера):
+### API E2E: верификация email (signUp → IMAP → verify-email, ТК 466)
+
+Автотест `tests/auth/test_auth_verify_email_e2e.py` — ручной кейс [466](https://team-vz1y.testit.software/browse/466): регистрация через API, письмо «Verify Your Email», подтверждение по `GET /auth/verify-email`, проверка `isVerified=true` в профиле. Teardown — удаление пользователя через API.
 
 ```bash
-RUN_MAIL_INTEGRATION=1 uv run pytest -q tests/auth/test_auth_verify_email_e2e.py -m "not ui"
+RUN_MAIL_INTEGRATION=1 uv run pytest \
+  tests/auth/test_auth_verify_email_e2e.py::test_email_verification_e2e -v
 ```
+
+Test IT: `--testit`, `externalId`: `yeahub-api-auth-email-verification-e2e-466`. CI: `scope=mail` или nightly **mail-e2e**.
 
 ### UI E2E (Playwright): вход по email и паролю (desktop, ТК 409)
 
