@@ -56,14 +56,14 @@ class UserResponse(BaseResponse):
     email: EmailStr
     birthday: datetime.date
     address: str
-    avatarUrl: str
+    avatarUrl: Optional[str] = None
     telegramUsername: Optional[str] = None
     createdAt: datetime.datetime = Field(alias="createdAt")
     updatedAt: datetime.datetime = Field(alias="updatedAt")
     userRoles: Optional[List[UserRole]] = None
     isVerified: Optional[bool] = None
     isEmailNotificationsEnable: Optional[bool] = None
-    profiles: List[Profiles]
+    profiles: Optional[List[Profiles]] = None
     subscriptions: Optional[list] = None
 
 

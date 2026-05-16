@@ -133,8 +133,8 @@ uv run pytest --collect-only
 - `scope=full` и ночной прогон (`schedule`) основного job: `pytest -m "integration and not ui"`, затем UI auth smoke (login ТК 409, register page, смена пароля ТК 113) и UI payment (если заданы `VERIFIED_USER_*`)
 - `scope=ui-auth`: Playwright auth/settings smoke — `test_login_email_desktop` (ТК 409), `test_register_page_opens`, `test_change_password_settings_desktop` (ТК 113; `registered_user`, без IMAP) (`--testit`, `APP_BASE_URL` по умолчанию `https://app.yeatwork.ru`)
 - `scope=ui-payment`: Playwright `tests/ui/subscription/test_subscription_payment_ui.py` (нужны secrets `VERIFIED_USER_EMAIL`, `VERIFIED_USER_PASSWORD`)
-- `scope=mail`: API `test_email_verification_e2e` + Playwright `test_register_and_verify_email_e2e` + онбординг `test_onboarding_full_flow_e2e` с `RUN_MAIL_INTEGRATION=1`, `--testit`, `APP_BASE_URL` по умолчанию `https://app.yeatwork.ru` (тайминги same-email для регистрационного e2e — дефолты в коде, как при локальном запуске)
-- ночной job **mail-e2e** (только `schedule`): те же три теста, что и при `scope=mail`, плюс `MAIL_*` secrets и установка Chromium для Playwright
+- `scope=mail`: API `test_email_verification_e2e` + Playwright register/verify + **forgot password recovery (ТК 115)** + онбординг `test_onboarding_full_flow_e2e` с `RUN_MAIL_INTEGRATION=1`, `--testit`, `APP_BASE_URL` по умолчанию `https://app.yeatwork.ru` (тайминги same-email для регистрационного e2e — дефолты в коде, как при локальном запуске)
+- ночной job **mail-e2e** (только `schedule`): те же **четыре** теста, что и при `scope=mail` (API verify-email, register→IMAP, forgot password ТК 115, onboarding), плюс `MAIL_*` secrets и установка Chromium для Playwright
 - перед тестами выполняется preflight API healthcheck (`/subscriptions` + доступность `/auth/refresh`)
 - после каждого manual/nightly run сохраняются artifacts `allure-results-<run_number>` и `allure-report-<run_number>`
 
@@ -260,6 +260,17 @@ CI (Integration workflow, scope `ui-auth` или ночной `schedule` / `scop
 ```bash
 uv run pytest tests/ui/auth/test_register_verify_email_e2e.py::test_register_page_opens -v
 ```
+
+### UI E2E (Playwright): восстановление пароля через письмо (desktop, ТК 115)
+
+Автотест `tests/ui/auth/test_forgot_password_recovery_desktop.py` — [115](https://team-vz1y.testit.software/browse/115): forgot-password → письмо `Reset Password` (IMAP) → `password-recovery` → interview + тост; затем API logout и UI login с новым паролем. Пользователь: `verified_registered_user` (API signUp + verify email).
+
+```bash
+RUN_MAIL_INTEGRATION=1 uv run pytest \
+  tests/ui/auth/test_forgot_password_recovery_desktop.py::test_forgot_password_recovery_desktop -v
+```
+
+С браузером: `--headed`. Test IT: `--testit`, `externalId`: `yeahub-ui-auth-forgot-password-recovery-desktop-115`. CI: `scope=mail` или nightly **mail-e2e**.
 
 ### UI E2E (Playwright): смена пароля в настройках (desktop, ТК 113)
 
@@ -397,6 +408,7 @@ uv run pre-commit run --all-files
 - `uv run ruff format . --check`
 - `uv run pytest -m "unit or pr_safe"`
 - для расширения `pr_safe` прогнать `unit or pr_safe` несколько раз подряд и зафиксировать baseline
+- при изменениях в UI auth/mail: `scope=ui-auth` в Integration CI или локально login 409 + change password 113; для ТК 115 — `RUN_MAIL_INTEGRATION=1` и `tests/ui/auth/test_forgot_password_recovery_desktop.py`
 - при изменениях в live-контуре дополнительно прогнать `smoke and integration` вручную
 - ветка обновлена через `merge origin/master`
 - новые зависимости добавлены в `pyproject.toml` и `uv.lock`

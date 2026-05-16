@@ -5,7 +5,7 @@ from imap_tools import MailBox
 
 from mail.exceptions import MessageNotFoundError, VerificationLinkNotFoundError
 from mail.models import MailMessage
-from mail.parsers import extract_verification_link
+from mail.parsers import extract_password_recovery_link, extract_verification_link
 
 
 class MailClient:
@@ -116,6 +116,17 @@ class MailClient:
             )
 
         return verification_link
+
+    def get_reset_password_link(self, message: MailMessage) -> str:
+        recovery_link = extract_password_recovery_link(
+            text=message.body,
+            html=message.html,
+        )
+        if recovery_link is None:
+            raise VerificationLinkNotFoundError(
+                "Password recovery link was not found in the email message."
+            )
+        return recovery_link
 
     def delete_message(self, uid: str) -> None:
         with MailBox(self.host, port=self.port).login(

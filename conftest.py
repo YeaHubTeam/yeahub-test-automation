@@ -35,9 +35,22 @@ def _delete_user_try_passwords(
         if pwd and pwd not in candidates:
             candidates.append(pwd)
     for pwd in candidates:
-        try:
-            api_manager.auth_api.authenticate((email, pwd))
-        except ValueError:
+        authed = False
+        for attempt in range(3):
+            try:
+                api_manager.auth_api.authenticate((email, pwd))
+                authed = True
+                break
+            except ValueError:
+                break
+            except (
+                requests.exceptions.ConnectionError,
+                requests.exceptions.ChunkedEncodingError,
+            ) as exc:
+                if attempt == 2:
+                    raise exc
+                time.sleep(1.5 * (attempt + 1))
+        if not authed:
             continue
         delete_resp = api_manager.user_api.delete_user(
             user_id, expected_status=[200, 204, 404, 401]

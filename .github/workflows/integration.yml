@@ -94,7 +94,7 @@ jobs:
           set -euo pipefail
 
           run_ui_auth_smoke() {
-            echo "UI auth smoke: login TC 409 + register page opens"
+            echo "UI auth smoke: login TC 409 + register page + change password TC 113"
             export APP_BASE_URL="${APP_BASE_URL:-https://app.yeatwork.ru}"
             export CI=true
             uv run pytest -q \
@@ -122,6 +122,7 @@ jobs:
             uv run pytest -q \
               tests/auth/test_auth_verify_email_e2e.py::test_email_verification_e2e \
               tests/ui/auth/test_register_verify_email_e2e.py::test_register_and_verify_email_e2e \
+              tests/ui/auth/test_forgot_password_recovery_desktop.py::test_forgot_password_recovery_desktop \
               tests/ui/interview/test_onboarding_flow_e2e.py::test_onboarding_full_flow_e2e \
               --alluredir=allure-results --testit
             exit 0
@@ -196,8 +197,8 @@ jobs:
         run: exit 1
 
   mail-e2e:
-    # Nightly: API mail e2e + Playwright UI register→IMAP→onboarding→delete→same-email (same-email timing defaults in code).
-    # Manual scope=mail runs the same tests in integration-tests (this job is schedule-only).
+    # Nightly: API verify-email + Playwright register→IMAP + forgot password (TC 115) + onboarding (same-email timing defaults in code).
+    # Manual scope=mail runs the same four tests in integration-tests (this job is schedule-only).
     if: ${{ github.event_name == 'schedule' }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -285,6 +286,7 @@ jobs:
           uv run pytest -q \
             tests/auth/test_auth_verify_email_e2e.py::test_email_verification_e2e \
             tests/ui/auth/test_register_verify_email_e2e.py::test_register_and_verify_email_e2e \
+            tests/ui/auth/test_forgot_password_recovery_desktop.py::test_forgot_password_recovery_desktop \
             tests/ui/interview/test_onboarding_flow_e2e.py::test_onboarding_full_flow_e2e \
             --alluredir=allure-results --testit
 
