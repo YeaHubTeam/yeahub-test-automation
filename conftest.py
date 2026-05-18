@@ -11,7 +11,11 @@ from models.auth_model import AuthModel
 from models.Subscriptions.model_subscription import ModelSubscriptionResponse
 from models.Subscriptions.model_user_subsriptions import UserSubscriptionResponse
 from resources.user_creds import VerifiedUserCreds
-from tests.mail.verification_flow import profile_user_id, verify_api_registered_user_email
+from tests.mail.verification_flow import (
+    authenticate_for_teardown,
+    profile_user_id,
+    verify_api_registered_user_email,
+)
 from tests.ui.flows.register_mail_interview_flow import new_plus_tagged_email, require_mail_creds
 from utils.data_generator import DataGenerator
 from utils.helpers import DataUtils
@@ -35,26 +39,12 @@ def _delete_user_try_passwords(
         if pwd and pwd not in candidates:
             candidates.append(pwd)
     for pwd in candidates:
-        authed = False
-        for attempt in range(3):
-            try:
-                api_manager.auth_api.authenticate((email, pwd))
-                authed = True
-                break
-            except ValueError:
-                break
-            except (
-                requests.exceptions.ConnectionError,
-                requests.exceptions.ChunkedEncodingError,
-            ) as exc:
-                if attempt == 2:
-                    raise exc
-                time.sleep(1.5 * (attempt + 1))
-        if not authed:
+        auth_result = authenticate_for_teardown(api_manager, email, pwd)
+        if auth_result == "auth_failed":
             continue
-        delete_resp = api_manager.user_api.delete_user(
-            user_id, expected_status=[200, 204, 404, 401]
-        )
+        if auth_result == "transient_failed":
+            continue
+        delete_resp = api_manager.user_api.delete_user(user_id, expected_status=[200, 204, 404])
         if delete_resp.status_code in (200, 204, 404):
             return
 

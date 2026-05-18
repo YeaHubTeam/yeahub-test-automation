@@ -68,7 +68,7 @@ def test_email_verification_e2e(api_manager: ApiManager):
                 "city": DataGenerator.random_city(),
                 "birthday": DataGenerator.random_birthday(),
                 "address": DataGenerator.random_address(),
-                "avatarUrl": DataGenerator.random_avatar_url(),
+                "avatarUrl": None,
             }
 
         with allure.step("Регистрируем пользователя (с ретраями на 503)"):
