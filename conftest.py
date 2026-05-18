@@ -1,5 +1,8 @@
+import time
+
 import pytest
 import requests
+from dotenv import load_dotenv
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
@@ -8,21 +11,57 @@ from models.auth_model import AuthModel
 from models.Subscriptions.model_subscription import ModelSubscriptionResponse
 from models.Subscriptions.model_user_subsriptions import UserSubscriptionResponse
 from resources.user_creds import VerifiedUserCreds
+from tests.mail.verification_flow import (
+    authenticate_for_teardown,
+    profile_user_id,
+    verify_api_registered_user_email,
+)
+from tests.ui.flows.register_mail_interview_flow import new_plus_tagged_email, require_mail_creds
 from utils.data_generator import DataGenerator
 from utils.helpers import DataUtils
 
+load_dotenv()
+
+
+def _delete_user_try_passwords(
+    api_manager: ApiManager,
+    *,
+    email: str,
+    user_id: str | None,
+    password: str,
+    active_password: str | None = None,
+) -> None:
+    """Teardown: login с active_password (если меняли) или исходным паролем → delete_user."""
+    if not user_id:
+        return
+    candidates: list[str] = []
+    for pwd in (active_password, password):
+        if pwd and pwd not in candidates:
+            candidates.append(pwd)
+    for pwd in candidates:
+        auth_result = authenticate_for_teardown(api_manager, email, pwd)
+        if auth_result == "auth_failed":
+            continue
+        if auth_result == "transient_failed":
+            continue
+        delete_resp = api_manager.user_api.delete_user(user_id, expected_status=[200, 204, 404])
+        if delete_resp.status_code in (200, 204, 404):
+            return
+
 
 def _session_with_retries() -> requests.Session:
-    """Транспортные ретраи при кратковременных 502/503/504 и обрывах соединения (без POST).
+    """Транспортные ретраи на сетевые ошибки (без ретраев по HTTP-статусам).
 
-    raise_on_status=False — после исчерпания попыток вернуть последний ответ (например 503),
-    чтобы CustomRequester по-прежнему отдавал ValueError со статусом, а не RetryError.
+    Ретраи по 502/503/504 обрабатываются в `CustomRequester`, чтобы избежать "двойных" ретраев
+    (Session Retry + логика клиента), которые раздувают время прогона.
     """
     session = requests.Session()
     retry = Retry(
-        total=3,
-        backoff_factor=0.5,
-        status_forcelist=(502, 503, 504),
+        total=1,
+        connect=1,
+        read=1,
+        status=0,
+        backoff_factor=0.2,
         allowed_methods=frozenset({"DELETE", "GET", "HEAD", "OPTIONS", "PUT", "TRACE"}),
         raise_on_status=False,
     )
@@ -55,24 +94,89 @@ def test_user():
         "city": DataGenerator.random_city(),
         "birthday": DataGenerator.random_birthday(),
         "address": DataGenerator.random_address(),
-        "avatarUrl": DataGenerator.random_avatar_url(),
+        # Без внешнего URL: бэкенд при delete_user иначе может дергать storage и отвечать
+        # storage.image.not_found (faker image_url / placekitten и т.п.).
+        "avatarUrl": None,
     }
 
 
 @pytest.fixture
 def registered_user(api_manager, test_user):
     """Регистрация пользователя и удаление его после теста"""
-    response = api_manager.auth_api.register_user(test_user, expected_status=201)
-    test_user["id"] = response.json().get("user", {}).get("id")
-    test_user["token"] = response.json().get("access_token")
+    # signUp иногда отвечает 503 от nginx; для устойчивости делаем короткие ретраи.
+    # Важно: на каждом ретрае меняем email/username, чтобы не упираться в 409 duplicate.
+    last_response = None
+    for attempt in range(5):
+        last_response = api_manager.auth_api.register_user(
+            test_user, expected_status=[201, 503, 409]
+        )
+        if last_response.status_code == 201:
+            break
+        test_user["email"] = DataGenerator.random_email()
+        test_user["username"] = DataGenerator.random_username()
+        time.sleep(2 * (attempt + 1))
+
+    assert last_response is not None
+    assert last_response.status_code == 201, "signUp is unavailable (503) after retries"
+
+    test_user["id"] = last_response.json().get("user", {}).get("id")
+    test_user["token"] = last_response.json().get("access_token")
     yield test_user
-    if (
-        "Authorization" not in api_manager.auth_api.headers
-    ):  # Проверяем что пользоватпель не залогинен
-        # Так как чтоб удалить пользователя нужно залогинется
-        api_manager.auth_api.authenticate((test_user["email"], test_user["password"]))
-    api_manager.user_api.delete_user(test_user["id"], expected_status=[404, 401])
-    # TODO поменять ожидаемый сатус код в teardown в методе "delete_user" на 200 после исправления бага
+    _delete_user_try_passwords(
+        api_manager,
+        email=test_user["email"],
+        user_id=test_user.get("id"),
+        password=test_user["password"],
+        active_password=test_user.get("active_password"),
+    )
+
+
+@pytest.fixture
+def verified_registered_user(api_manager, test_user):
+    """signUp → IMAP verify → teardown delete. Для mail/UI с `isVerified=true` (не для TC 113).
+
+    Email — `local+tag@domain` на MAIL_EMAIL (иначе IMAP не найдёт письмо верификации).
+    """
+    require_mail_creds()
+    started_at, _tag, recipient_email, password, username = new_plus_tagged_email()
+    test_user["email"] = recipient_email
+    test_user["password"] = password
+    test_user["username"] = username
+    last_response = None
+    for attempt in range(5):
+        last_response = api_manager.auth_api.register_user(
+            test_user, expected_status=[201, 503, 409]
+        )
+        if last_response.status_code == 201:
+            break
+        started_at, _tag, recipient_email, password, username = new_plus_tagged_email()
+        test_user["email"] = recipient_email
+        test_user["password"] = password
+        test_user["username"] = username
+        time.sleep(2 * (attempt + 1))
+
+    assert last_response is not None
+    assert last_response.status_code == 201, "signUp is unavailable (503) after retries"
+
+    test_user["id"] = last_response.json().get("user", {}).get("id")
+    test_user["token"] = last_response.json().get("access_token")
+    api_manager.auth_api.authenticate((test_user["email"], test_user["password"]))
+    user_id = profile_user_id(api_manager.auth_api.profile().json())
+    verify_api_registered_user_email(
+        api_manager,
+        email=test_user["email"],
+        password=test_user["password"],
+        user_id=user_id,
+        started_at=started_at,
+    )
+    yield test_user
+    _delete_user_try_passwords(
+        api_manager,
+        email=test_user["email"],
+        user_id=test_user.get("id"),
+        password=test_user["password"],
+        active_password=test_user.get("active_password"),
+    )
 
 
 @pytest.fixture
@@ -82,7 +186,15 @@ def logged_in_user(api_manager, registered_user):
         "username": registered_user["email"],
         "password": registered_user["password"],
     }
-    api_manager.auth_api.login_user(login_data)
+    last_login = None
+    for attempt in range(5):
+        last_login = api_manager.auth_api.login_user(login_data, expected_status=[201, 503])
+        if last_login.status_code == 201:
+            break
+        time.sleep(2 * (attempt + 1))
+    assert last_login is not None
+    assert last_login.status_code == 201, "login is unavailable (503) after retries"
+
     api_manager.auth_api.authenticate((registered_user["email"], registered_user["password"]))
 
     return registered_user
@@ -96,17 +208,36 @@ def static_user(api_manager):
         "username": VerifiedUserCreds.EMAIL,
         "password": VerifiedUserCreds.PASSWORD,
     }
-    data_user = api_manager.auth_api.login_user(login_data).json()
+    last_login = None
+    for attempt in range(5):
+        last_login = api_manager.auth_api.login_user(login_data, expected_status=[201, 503])
+        if last_login.status_code == 201:
+            break
+        time.sleep(2 * (attempt + 1))
+    assert last_login is not None
+    assert last_login.status_code == 201, "static user login is unavailable (503) after retries"
+
+    data_user = last_login.json()
     api_manager.auth_api.authenticate((VerifiedUserCreds.EMAIL, VerifiedUserCreds.PASSWORD))
     validate_user = AuthModel.model_validate(data_user)
     yield validate_user.user
-    api_manager.auth_api.logout(expected_status=[200, 401])
+    api_manager.auth_api.logout(expected_status=[200, 401, 503])
 
 
 @pytest.fixture(scope="session")
 def get_list_subscriptions(api_manager):
-    response = api_manager.subscriptions_api.get_subscriptions().json()
-    return DataUtils.type_adapter(list[ModelSubscriptionResponse], response)
+    last_response = None
+    for attempt in range(5):
+        last_response = api_manager.subscriptions_api.get_subscriptions(expected_status=[200, 503])
+        if last_response.status_code == 200:
+            break
+        time.sleep(2 * (attempt + 1))
+
+    assert last_response is not None
+    assert last_response.status_code == 200, "subscriptions list is unavailable (503) after retries"
+
+    response_json = last_response.json()
+    return DataUtils.type_adapter(list[ModelSubscriptionResponse], response_json)
 
 
 @pytest.fixture(scope="function")
@@ -117,9 +248,22 @@ def payment_link_subscriptions(api_manager, static_user, get_list_subscriptions)
         condition=lambda sub: sub.name == "Премиум на 3 месяца",
         transform=lambda sub: sub.id,
     )
-    existing_subscriptions = api_manager.subscriptions_api.get_subscriptions_users(
-        static_user.id
-    ).json()
+    # subscriptions/users иногда отвечает 503 от nginx; для устойчивости делаем короткие ретраи
+    last_existing = None
+    for attempt in range(5):
+        last_existing = api_manager.subscriptions_api.get_subscriptions_users(
+            static_user.id, expected_status=[200, 503]
+        )
+        if last_existing.status_code == 200:
+            break
+        time.sleep(2 * (attempt + 1))
+
+    assert last_existing is not None
+    assert last_existing.status_code == 200, (
+        "subscriptions/users is unavailable (503) after retries"
+    )
+
+    existing_subscriptions = last_existing.json()
     validated_subscriptions = DataUtils.type_adapter(
         list[UserSubscriptionResponse], existing_subscriptions
     )
@@ -137,11 +281,22 @@ def payment_link_subscriptions(api_manager, static_user, get_list_subscriptions)
         }
         api_manager.subscriptions_api.delete_subscriptions(cleanup_body, expected_status=[200, 404])
 
-    response = api_manager.subscriptions_api.subscriptions_payment_pending(
-        id_subscriptions,
-        static_user.email,
-    )
-    payment_url = response.text
+    # payment/init иногда отвечает 503 от nginx; для устойчивости делаем короткие ретраи
+    last_response = None
+    for attempt in range(5):
+        last_response = api_manager.subscriptions_api.subscriptions_payment_pending(
+            id_subscriptions,
+            static_user.email,
+            expected_status=[200, 503],
+        )
+        if last_response.status_code == 200:
+            break
+        time.sleep(2 * (attempt + 1))
+
+    assert last_response is not None
+    assert last_response.status_code == 200, "payment/init is unavailable (503) after retries"
+
+    payment_url = last_response.text
     yield payment_url
     teardown_subscriptions = api_manager.subscriptions_api.get_subscriptions_users(
         static_user.id

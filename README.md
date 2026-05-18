@@ -87,6 +87,7 @@ cp .env.example .env
 - `MAIL_PASSWORD`
 - `MAIL_FOLDER`
 - `RUN_MAIL_INTEGRATION`
+- опционально (повторная регистрация на тот же email после удаления): переопределение дефолтов через `REGISTER_SAME_EMAIL_*` — см. `tests/ui/flows/same_email_retry_config.py` и комментарии в `.env.example`
 
 ### Для чего они нужны
 
@@ -127,15 +128,20 @@ uv run pytest --collect-only
 
 `Integration CI` — `.github/workflows/integration.yml`
 - запускается вручную через `Actions -> Integration (Live) -> Run workflow`
-- запускается автоматически ночью по `schedule`
-- `scope=smoke` запускает `pytest -m "smoke and integration"`
-- `scope=full` и nightly запускают `pytest -m "integration"`
+- запускается автоматически ночью по `schedule` (основной job + отдельный **mail-e2e**)
+- `scope=smoke` запускает `pytest -m "smoke and integration and not ui"` (без Playwright UI)
+- `scope=full` и ночной прогон (`schedule`) основного job: `pytest -m "integration and not ui"`, затем UI auth smoke (login ТК 409, register page, смена пароля ТК 113) и UI payment (если заданы `VERIFIED_USER_*`)
+- `scope=ui-auth`: Playwright auth/settings smoke — `test_login_email_desktop` (ТК 409), `test_register_page_opens`, `test_change_password_settings_desktop` (ТК 113; `registered_user`, без IMAP) (`--testit`, `APP_BASE_URL` по умолчанию `https://app.yeatwork.ru`)
+- `scope=ui-payment`: Playwright `tests/ui/subscription/test_subscription_payment_ui.py` (нужны secrets `VERIFIED_USER_EMAIL`, `VERIFIED_USER_PASSWORD`)
+- `scope=mail`: API `test_email_verification_e2e` + Playwright register/verify + **forgot password recovery (ТК 115)** + онбординг `test_onboarding_full_flow_e2e` с `RUN_MAIL_INTEGRATION=1`, `--testit`, `APP_BASE_URL` по умолчанию `https://app.yeatwork.ru` (тайминги same-email для регистрационного e2e — дефолты в коде, как при локальном запуске)
+- ночной job **mail-e2e** (только `schedule`): те же **четыре** теста, что и при `scope=mail` (API verify-email, register→IMAP, forgot password ТК 115, onboarding), плюс `MAIL_*` secrets и установка Chromium для Playwright
 - перед тестами выполняется preflight API healthcheck (`/subscriptions` + доступность `/auth/refresh`)
 - после каждого manual/nightly run сохраняются artifacts `allure-results-<run_number>` и `allure-report-<run_number>`
 
 Для `Integration CI` в GitHub Actions должны быть заведены repository secrets:
 - `VERIFIED_USER_EMAIL`
 - `VERIFIED_USER_PASSWORD`
+- для mail / nightly mail-e2e: `MAIL_HOST`, `MAIL_PORT`, `MAIL_EMAIL`, `MAIL_PASSWORD`, `MAIL_FOLDER` (и при использовании Test IT — `TMS_*`, см. workflow)
 
 Artifacts доступны на странице конкретного workflow run в GitHub Actions.
 
@@ -157,6 +163,7 @@ Artifacts доступны на странице конкретного workflow
 - `smoke and integration` - live smoke на реальном стенде
 - `integration` - полный live integration контур
 - `unit or pr_safe` - стабильный контур для Fast CI
+- явные пути UI в Integration CI (`scope=ui-auth`, `scope=ui-payment`, ночной `schedule`, `scope=full`) — не через `-m ui`, чтобы не затянуть mail e2e и нестабильные сценарии
 
 Важно:
 - `smoke` и `integration` не исключают друг друга
@@ -166,28 +173,141 @@ Artifacts доступны на странице конкретного workflow
 
 ## Mail integration tests
 
-Для mail-слоя используется реальный IMAP-ящик. Сейчас подходит `mailbox.org`, но можно использовать любой рабочий IMAP-ящик. Креды хранятся локально в `.env` и читаются через `resources/mail_creds.py`.
-
-Mail integration сейчас покрывает flow письма верификации `Verify Your Email`.
+Для mail-слоя используется реальный IMAP-ящик (например, Яндекс.Почта или любой другой провайдер с IMAP). Креды хранятся локально в `.env` и читаются через `resources/mail_creds.py`.
 
 Ограничения:
 - письмо с верификацией может попасть в спам
 - письмо может вообще не дойти до тестового ящика
 - integration-тест не запускается автоматически
 - такой тест лучше использовать как ручную live-проверку
-- mail credentials сейчас не прокидываются в GitHub Actions: до появления постоянного рабочего mailbox mail flow остается локальным ручным сценарием через `.env`
+- для CI mail flow: nightly job **mail-e2e** и manual `scope=mail` в Integration workflow (нужны secrets `MAIL_*`); локально — `.env` и `RUN_MAIL_INTEGRATION=1`
 
-Перед запуском:
-1. Подготовить рабочий mailbox с IMAP-доступом
-2. Убедиться, что переменные `MAIL_*` заполнены в `.env`
-3. Отправить письмо верификации на этот ящик
-4. Запустить integration-тест вручную
+### Smoke: проверка IMAP-клиента и парсинга ссылки
 
-Запуск:
+Тест проверяет, что:
+- IMAP логин работает
+- письмо с темой `Verify Your Email` находится
+- ссылка `/auth/verify-email?token=...` извлекается
+- письмо можно удалить (чтобы ящик не разрастался)
+
+Важно:
+- `.env` содержит секреты и **не должен коммититься**
+- smoke-тест **не отправляет** письмо сам — он предполагает, что в ящике уже есть письмо верификации
+
+Запуск smoke:
 
 ```bash
 RUN_MAIL_INTEGRATION=1 uv run pytest tests/mail/test_mail_client_integration.py
 ```
+
+### E2E верификация email через IMAP (registration → email → verify-email)
+
+В репозитории есть live e2e тест, который проверяет полный backend-flow:
+1) регистрация пользователя на email вида `verify-test+<tag>@domain`  
+2) `GET /auth/send-verification-email/{user_id}` (с учётом rate limit)  
+3) IMAP: ожидание письма `Verify Your Email` и извлечение ссылки `/auth/verify-email?token=...`  
+4) `GET /auth/verify-email?token=...`  
+5) `GET /auth/profile` → `isVerified=true`
+
+Тест помечен как `integration` и запускается только при `RUN_MAIL_INTEGRATION=1`.
+
+Перед запуском:
+- заполнить `MAIL_HOST/MAIL_PORT/MAIL_EMAIL/MAIL_PASSWORD/MAIL_FOLDER` в `.env`
+- убедиться, что в почте включён IMAP и используется правильный способ авторизации
+
+Пример для Яндекс.Почты:
+- IMAP сервер: `imap.yandex.ru`, порт `993`, папка `INBOX`
+- в настройках ящика включить IMAP
+- в Яндекс ID создать **пароль приложения** для “Почта / IMAP POP3 SMTP” и использовать его как `MAIL_PASSWORD`
+
+Минимальный пример `MAIL_*`:
+
+```bash
+MAIL_HOST=imap.yandex.ru
+MAIL_PORT=993
+MAIL_FOLDER=INBOX
+MAIL_EMAIL=verify-test@yeahub.ru
+MAIL_PASSWORD=<app_password>
+```
+
+Примечание:
+- письмо может приходить с задержкой (обычно до 1–3 минут) — тест e2e умеет ждать письмо с polling
+- backend может ограничивать частоту отправки verification email (например, не чаще ~1 раза в 60 секунд) — тест e2e умеет ждать и повторять отправку
+- после извлечения ссылки тест удаляет письмо из ящика, чтобы следующий прогон не цеплял старые письма
+
+### API E2E: верификация email (signUp → IMAP → verify-email, ТК 466)
+
+Автотест `tests/auth/test_auth_verify_email_e2e.py` — ручной кейс [466](https://team-vz1y.testit.software/browse/466): регистрация через API, письмо «Verify Your Email», подтверждение по `GET /auth/verify-email`, проверка `isVerified=true` в профиле. Teardown — удаление пользователя через API.
+
+```bash
+RUN_MAIL_INTEGRATION=1 uv run pytest \
+  tests/auth/test_auth_verify_email_e2e.py::test_email_verification_e2e -v
+```
+
+Test IT: `--testit`, `externalId`: `yeahub-api-auth-email-verification-e2e-466`. CI: `scope=mail` или nightly **mail-e2e**.
+
+### UI E2E (Playwright): вход по email и паролю (desktop, ТК 409)
+
+Автотест `tests/ui/auth/test_login_email_desktop.py` — ручной кейс [409](https://team-vz1y.testit.software/browse/409), **шаги 1–4**: форма `/auth/login`, ввод email/пароля, «Вход», переход на `/interview`. Пользователь создаётся через API (`registered_user`), в teardown удаляется (`delete_user`). Постусловие «Выйти» через UI в этом тесте **не** автоматизировано (см. onboarding e2e / `tests/auth/test_auth_logout.py`).
+
+Локальный запуск:
+
+```bash
+uv run pytest tests/ui/auth/test_login_email_desktop.py::test_login_with_email_and_password_desktop -v
+```
+
+С браузером: `--headed`. Test IT: `--testit` и `TMS_*` в `.env` (см. `pyproject.toml`, `[testit]`). `externalId` в коде: `yeahub-ui-auth-login-email-password-desktop-409`.
+
+CI (Integration workflow, scope `ui-auth` или ночной `schedule` / `scope=full` после API): см. [CI Strategy](#ci-strategy).
+
+В том же scope `ui-auth` дополнительно гоняется лёгкий smoke «открылась страница регистрации»:
+
+```bash
+uv run pytest tests/ui/auth/test_register_verify_email_e2e.py::test_register_page_opens -v
+```
+
+### UI E2E (Playwright): восстановление пароля через письмо (desktop, ТК 115)
+
+Автотест `tests/ui/auth/test_forgot_password_recovery_desktop.py` — [115](https://team-vz1y.testit.software/browse/115): forgot-password → письмо `Reset Password` (IMAP) → `password-recovery` → interview + тост; затем API logout и UI login с новым паролем. Пользователь: `verified_registered_user` (API signUp + verify email).
+
+```bash
+RUN_MAIL_INTEGRATION=1 uv run pytest \
+  tests/ui/auth/test_forgot_password_recovery_desktop.py::test_forgot_password_recovery_desktop -v
+```
+
+С браузером: `--headed`. Test IT: `--testit`, `externalId`: `yeahub-ui-auth-forgot-password-recovery-desktop-115`. CI: `scope=mail` или nightly **mail-e2e**.
+
+### UI E2E (Playwright): смена пароля в настройках (desktop, ТК 113)
+
+Автотест `tests/ui/settings/test_change_password_desktop.py` — [113](https://team-vz1y.testit.software/browse/113): `/settings#change-password`, смена пароля, logout, вход с новым паролем. Пользователь: API `registered_user` (верификация email **не** требуется), teardown — `delete_user` с актуальным паролем.
+
+```bash
+uv run pytest tests/ui/settings/test_change_password_desktop.py::test_change_password_settings_desktop -v
+```
+
+С браузером: `--headed`. Test IT: `--testit`, `externalId`: `yeahub-ui-settings-change-password-desktop-113`. CI: тот же `scope=ui-auth`, что login 409.
+
+### UI E2E (Playwright): оплата подписки (T-Bank)
+
+`tests/ui/subscription/test_subscription_payment_ui.py` — UI оплаты по ссылке из API (`static_user` / `VERIFIED_USER_*` в secrets).
+
+```bash
+uv run pytest tests/ui/subscription/test_subscription_payment_ui.py -v
+```
+
+CI: Integration workflow, scope `ui-payment` (или ночной `schedule` / `scope=full` после auth smoke, если заданы `VERIFIED_USER_*`).
+
+### UI E2E (Playwright): регистрация в браузере → IMAP → онбординг → удаление → опционально тот же email
+
+Отдельный сценарий в `tests/ui/auth/test_register_verify_email_e2e.py`: форма на `/auth/register`, реальный ящик для письма верификации, затем UI-онбординг, удаление аккаунта в настройках и при необходимости вторая регистрация на тот же адрес (дефолтные тайминги и API-probe — в `tests/ui/flows/same_email_retry_config.py` и `tests/mail/verification_flow.py`; при необходимости переопредели `REGISTER_SAME_EMAIL_*` в `.env` — бэкенд может отвечать `user.user.email.limited_period`).
+
+Пример локального запуска:
+
+```bash
+RUN_MAIL_INTEGRATION=1 uv run pytest tests/ui/auth/test_register_verify_email_e2e.py::test_register_and_verify_email_e2e -v
+```
+
+С браузером на экране: добавь `--headed`. Отчёт в Test IT: добавь `--testit` и задай `TMS_*` в `.env` (см. `pyproject.toml`, секция `[testit]`). Поле **`@testit.externalId`** в тесте должно **точно совпадать** с «Внешним ID» существующего автотеста в библиотеке TMS (часто это длинная hex-строка); иначе адаптер не попадёт в нужную запись при `automaticCreationTestCases=false`.
 
 Если нужно прогнать только mail-тесты:
 
@@ -293,6 +413,7 @@ uv run pre-commit run --all-files
 - `uv run ruff format . --check`
 - `uv run pytest -m "unit or pr_safe"`
 - для расширения `pr_safe` прогнать `unit or pr_safe` несколько раз подряд и зафиксировать baseline
+- при изменениях в UI auth/mail: `scope=ui-auth` в Integration CI или локально login 409 + change password 113; для ТК 115 — `RUN_MAIL_INTEGRATION=1` и `tests/ui/auth/test_forgot_password_recovery_desktop.py`
 - при изменениях в live-контуре дополнительно прогнать `smoke and integration` вручную
 - ветка обновлена через `merge origin/master`
 - новые зависимости добавлены в `pyproject.toml` и `uv.lock`

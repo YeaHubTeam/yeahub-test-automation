@@ -21,8 +21,8 @@ class DataPaymentModel(BaseResponse):
     order: OrderModel = Field(..., description="Описание заказа и id заказа")
     admToggle: List[AdmToggleItem]
     pfToggle: List[PfToggleItem]
-    custom: CustomModel
-    dco: DcoModel
+    custom: CustomModel | None = None
+    dco: DcoModel | None = None
     language: str
     customer: CustomerModel = Field(..., description="Данные заказчика")
 
@@ -63,6 +63,7 @@ class DcoModel(BaseResponse):
 class CardSettings(BaseResponse):
     allowSaveCard: bool
     showFee: bool
+    customerCards: List[dict[str, Any]] | None = None
 
 
 class PaymentsSettingsModel(BaseResponse):

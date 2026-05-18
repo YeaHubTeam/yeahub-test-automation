@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import time
 
 
 class CustomRequester:
@@ -50,7 +51,32 @@ class CustomRequester:
         # 3. Объединяем с одним слешем
         url = f"{base_url_clean}/{endpoint_clean}"
 
+        # Выполняем запрос и делаем короткие ретраи на 502/503/504 для идемпотентных методов.
+        # Это стабилизирует прогоны на стенде, где nginx иногда отдаёт transient 503.
         response = self.session.request(method, url, json=data, params=params)
+
+        retryable_methods = {"DELETE", "GET", "HEAD", "OPTIONS", "PUT", "TRACE"}
+        transient_statuses = {502, 503, 504}
+        max_attempts = 5
+        attempt = 1
+        while (
+            method in retryable_methods
+            and response.status_code in transient_statuses
+            and attempt < max_attempts
+        ):
+            time.sleep(2 * attempt)
+            response = self.session.request(method, url, json=data, params=params)
+            attempt += 1
+
+        if attempt > 1:
+            self.logger.info(
+                "Transient HTTP %s for %s %s; retried %s/%s attempts",
+                response.status_code,
+                method,
+                url,
+                attempt,
+                max_attempts,
+            )
 
         if need_logging:
             self.log_request_and_response(response)

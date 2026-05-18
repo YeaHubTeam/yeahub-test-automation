@@ -5,12 +5,10 @@ from urllib.parse import urlparse
 import allure
 import pytest
 import requests
-from pydantic import TypeAdapter
 from pytest_check import check
 
 from constants.constants import NAME_SUBSCRIPTIONS, PAYMENT_SUBSCRIPTIONS_URL
 from constants.currency_code import CurrencyCode
-from models.Subscriptions.model_data_payment import DataPaymentModel
 from models.Subscriptions.model_user_subsriptions import (
     ModelErrorResponse,
     UserSubscriptionResponse,
@@ -61,43 +59,47 @@ class TestSubscriptionPositive:
         with allure.step("Извлечение данных для оплаты"):
             payment_data = requests.get(f"{PAYMENT_SUBSCRIPTIONS_URL}{payment_id}").json()
 
-        with allure.step("Проверка дынных для оплаты через модель пудантик"):
-            payment_details = DataPaymentModel.model_validate(payment_data)
-
         with allure.step("Assert"):
-            check.equal(payment_details.sessionId, payment_id, "ID сессии не совпадают")
-            check.equal(payment_details.status.value, "NEW", "Статус не совпадает")
-            check.equal(payment_details.merchant.name, "YeaHub", "Название не совпадает")
-            check.equal(payment_details.merchant.backUrl, "https://yeahub.ru", "URL не совпадает")
+            # Внешний провайдер может расширять/менять структуру ответа.
+            # Здесь проверяем только инварианты интеграции, которые критичны для продукта.
+            check.equal(payment_data.get("sessionId"), payment_id, "ID сессии не совпадают")
+            status = payment_data.get("status") or {}
+            check.equal(status.get("value"), "NEW", "Статус не совпадает")
+            merchant = payment_data.get("merchant") or {}
+            check.equal(merchant.get("name"), "YeaHub", "Название не совпадает")
+            check.equal(merchant.get("backUrl"), "https://yeahub.ru", "URL не совпадает")
+            template_params = payment_data.get("templateParams") or {}
             check.equal(
-                payment_details.templateParams.merchantPhone,
+                template_params.get("merchantPhone"),
                 "9183374202",
                 "Номер телефона не совпадает",
             )
             check.equal(
-                payment_details.templateParams.companyName,
+                template_params.get("companyName"),
                 "ИП КУЯНЕЦ РУСЛАН РОСТИСЛАВОВИЧ",
                 "Получатель не совпадает",
             )
             check.equal(
-                payment_details.templateParams.companyAddress,
+                template_params.get("companyAddress"),
                 "ул им. генерала И.Л. Шифрина, д 1",
                 "Получатель не совпадает",
             )
-            check.equal(payment_details.amount, price_tarif, "Итоговая сумма не совпадает")
-            check.equal(payment_details.currency, CurrencyCode.RUB, "Код валюты не совпадает")
+            check.equal(payment_data.get("amount"), price_tarif, "Итоговая сумма не совпадает")
+            check.equal(payment_data.get("currency"), CurrencyCode.RUB, "Код валюты не совпадает")
+            order = payment_data.get("order") or {}
             check.equal(
-                payment_details.order.description,
+                order.get("description"),
                 "Оплата подписки 'Премиум на 3 месяца'",
                 "Описание не совпадает",
             )
-            check.equal(payment_details.customer.key, static_user.id, "ID заказчика не совпадают")
+            customer = payment_data.get("customer") or {}
+            check.equal(customer.get("key"), static_user.id, "ID заказчика не совпадают")
             check.equal(
-                payment_details.customer.email, static_user.email, "Email заказчика не совпадают"
+                customer.get("email"),
+                static_user.email,
+                "Email заказчика не совпадают",
             )
-            assert datetime.datetime.fromisoformat(payment_details.status.timestamp), (
-                "Неверный формат даты"
-            )
+            assert datetime.datetime.fromisoformat(status.get("timestamp")), "Неверный формат даты"
 
     @allure.title("Проверка статуса подписки после создания оплаты")
     def test_status_subscription_after_payment(
