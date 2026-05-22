@@ -36,7 +36,30 @@ class RegisterPage:
 
     def open(self):
         self.page.goto("/auth/register", wait_until="domcontentloaded", timeout=60_000)
+        self.expect_register_form_initial_state()
+
+    def expect_register_form_initial_state(self) -> None:
+        """ТК регистрация, шаг 1: форма, чекбоксы, кнопка неактивна."""
+        fields = [
+            self.username,
+            self.email,
+            self.password,
+            self.password_confirmation,
+        ]
+        for field in fields:
+            expect(field).to_be_visible()
+
+        for name in ("privacyConsent", "offerConsent", "adConsent"):
+            expect(self._consent_checkbox(name)).to_be_visible()
+
         expect(self.submit_button).to_be_visible()
+        expect(self.submit_button).to_be_disabled()
+
+    def expect_submit_disabled(self) -> None:
+        expect(self.submit_button).to_be_disabled()
+
+    def expect_submit_enabled(self) -> None:
+        expect(self.submit_button).to_be_enabled()
 
     def open_with_clean_session(self) -> None:
         """После logout/удаления аккаунта: cookies + web storage, иначе повторная регистрация часто остаётся на /auth/register."""
@@ -45,7 +68,7 @@ class RegisterPage:
         self.page.evaluate(
             "() => { try { localStorage.clear(); sessionStorage.clear(); } catch (_) {} }",
         )
-        expect(self.submit_button).to_be_visible()
+        self.expect_register_form_initial_state()
 
     def fill_register_form(self, username, email, password):
         self.username.fill(username)
@@ -63,20 +86,25 @@ class RegisterPage:
         expect(box).to_be_visible()
         box.set_checked(True, force=True)
 
-    def check_checkboxes(self):
+    def check_privacy_consent(self) -> None:
         self._check_consent_by_name("privacyConsent")
-        expect(self.submit_button).to_be_disabled()
         expect(self._consent_checkbox("privacyConsent")).to_be_checked()
+        self.expect_submit_disabled()
 
+    def check_offer_consent(self) -> None:
         self._check_consent_by_name("offerConsent")
         expect(self._consent_checkbox("offerConsent")).to_be_checked()
-        # По ТК третье согласие (реклама) необязательно — кнопка активна после двух обязательных.
-        expect(self.submit_button).to_be_enabled()
+        self.expect_submit_enabled()
 
-    def check_marketing_consent(self):
-        """Опционально: согласие на рекламу (если нужен отдельный сценарий)."""
+    def check_checkboxes(self) -> None:
+        self.check_privacy_consent()
+        self.check_offer_consent()
+
+    def check_marketing_consent(self) -> None:
+        """Опционально: согласие на рекламу (шаг 8 ТК — кнопка остаётся активной)."""
         self._check_consent_by_name("adConsent")
         expect(self._consent_checkbox("adConsent")).to_be_checked()
+        self.expect_submit_enabled()
 
     def submit_registration(self):
         self.submit_button.click()
