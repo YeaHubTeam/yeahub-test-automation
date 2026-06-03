@@ -48,28 +48,44 @@ def test_register_form_desktop(page: Page, api_manager: ApiManager):
     register_page = RegisterPage(page)
     interview_page = InterviewPage(page)
 
-    with report_step("Предусловие: открыта /auth/register, форма в начальном состоянии"):
+    with report_step(
+        "Предусловие: открыта /auth/register, форма в начальном состоянии",
+        "URL /auth/register; поля и чекбоксы видны; «Зарегистрироваться» неактивна",
+    ):
         register_page.open()
         expect(page).to_have_url(re.compile(r".*/auth/register$"))
 
-    with report_step("Шаги 2–5: заполнить поля, кнопка остаётся неактивной"):
+    with report_step(
+        "Шаги 2–5: заполнить поля",
+        "Поля username, email, пароль заполнены; «Зарегистрироваться» неактивна",
+    ):
         register_page.username.fill(username)
         register_page.email.fill(email)
         register_page.password.fill(password)
         register_page.password_confirmation.fill(password)
         register_page.expect_submit_disabled()
 
-    with report_step("Шаг 6: согласие на обработку ПД"):
+    with report_step(
+        "Шаг 6: согласие на обработку ПД",
+        "Чекбокс ПД отмечен; «Зарегистрироваться» неактивна",
+    ):
         register_page.check_privacy_consent()
 
-    with report_step("Шаг 7: согласие с договором-офертой — кнопка активна"):
+    with report_step(
+        "Шаг 7: согласие с договором-офертой",
+        "Чекбокс оферты отмечен; «Зарегистрироваться» активна",
+    ):
         register_page.check_offer_consent()
 
-    with report_step("Шаг 8: опциональное согласие на рассылку"):
+    with report_step(
+        "Шаг 8: опциональное согласие на рассылку",
+        "Чекбокс рассылки отмечен; «Зарегистрироваться» активна",
+    ):
         register_page.check_marketing_consent()
 
     with report_step(
-        "Шаг 9: «Зарегистрироваться» → /interview, модалка Onboarding (без прохождения онбординга)"
+        "Шаг 9: «Зарегистрироваться»",
+        "URL /interview; модалка Onboarding 1/5 видна (онбординг не проходим)",
     ):
         register_page.submit_registration()
         register_page.wait_after_successful_register()

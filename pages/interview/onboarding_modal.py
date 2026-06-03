@@ -2,6 +2,11 @@ import re
 
 from playwright.sync_api import expect
 
+# Эталон специализации для автотестов (stage: id=11, slug=react-frontend-developer).
+REFERENCE_SPECIALIZATION_ID = 11
+REFERENCE_SPECIALIZATION_TITLE_PATTERN = re.compile(r"React\s+Frontend\s+Developer", re.I)
+CLOSE_MODAL_BUTTON_NAME = re.compile(r"Закрыть модальное окно|Close modal", re.I)
+
 
 class OnboardingModal:
     def __init__(self, page):
@@ -32,8 +37,18 @@ class OnboardingModal:
 
     @property
     def close_icon(self):
-        """Крестик в шапке модалки (на ранних шагах часто не кликабелен)."""
-        return self.modal.get_by_test_id("Modal_Close_Icon")
+        """Крестик в шапке: `aria-label` «Закрыть модальное окно» / `data-testid=Modal_Close_Icon`."""
+        by_aria = self.modal.get_by_role("button", name=CLOSE_MODAL_BUTTON_NAME)
+        if by_aria.count():
+            return by_aria.first
+        return self.modal.get_by_test_id("Modal_Close_Icon").first
+
+    def click_modal_close_button(self) -> None:
+        """ТК шаг 7: кнопка закрытия модалки (SVG с aria-label в шапке онбординга)."""
+        close_btn = self.close_icon
+        expect(close_btn).to_be_visible(timeout=12_000)
+        expect(close_btn).to_be_enabled(timeout=5_000)
+        close_btn.click(timeout=10_000)
 
     @property
     def onboarding_modal_close_btn(self):
@@ -49,7 +64,12 @@ class OnboardingModal:
         expect(self.modal.get_by_text(re.compile(rf"{current}\s*/\s*{total}"))).to_be_visible()
 
     def expect_onboarding_hidden(self, timeout_ms: int = 25_000) -> None:
-        expect(self.modal).to_be_hidden(timeout=timeout_ms)
+        self.expect_onboarding_dismissed(timeout_ms=timeout_ms)
+
+    def expect_onboarding_dismissed(self, timeout_ms: int = 30_000) -> None:
+        """Онбординг завершён: нет заголовка Onboarding и stepper-модалки."""
+        expect(self.page.get_by_role("heading", name="Onboarding")).to_be_hidden(timeout=timeout_ms)
+        expect(self.modal).to_be_hidden(timeout=5_000)
 
     def click_continue(self):
         self.continue_btn.click()
@@ -77,12 +97,13 @@ class OnboardingModal:
     def expect_specialization_list_visible(self) -> None:
         expect(self.page.get_by_role("option").first).to_be_visible(timeout=10_000)
 
-    def choose_qa_engineer_specialization(self) -> None:
-        self.page.get_by_role("option", name=re.compile(r"qa\s*engineer", re.I)).click()
+    def choose_reference_specialization(self) -> None:
+        """Эталон: React Frontend Developer (см. REFERENCE_SPECIALIZATION_ID)."""
+        self.page.get_by_role("option", name=REFERENCE_SPECIALIZATION_TITLE_PATTERN).click()
 
-    def open_drop_down_and_choose_specialization(self):
+    def open_drop_down_and_choose_specialization(self) -> None:
         self.open_specialization_dropdown()
-        self.choose_qa_engineer_specialization()
+        self.choose_reference_specialization()
 
     def complete_tc_steps_2_through_7(self) -> None:
         """Шаги модалки 2–7: специализация → сохранить → 3–4 → Позже → 5/5 → крестик.
@@ -93,7 +114,7 @@ class OnboardingModal:
         self.expect_onboarding_second_step_visible()
         self.open_specialization_dropdown()
         self.expect_specialization_list_visible()
-        self.choose_qa_engineer_specialization()
+        self.choose_reference_specialization()
         expect(self.modal.get_by_test_id("dropdown-select")).to_be_visible()
 
         self.click_save_and_continue()
@@ -107,8 +128,52 @@ class OnboardingModal:
 
         self.expect_progress_fraction(5, 5)
         self.expect_onboarding_fifth_step_visible()
+        self.complete_onboarding_step_7_close()
+
+    def complete_onboarding_step_7_close(self) -> None:
+        """ТК шаг 7: крестик «Закрыть модальное окно»; fallback — Primary / Continue / close_onboarding_modal."""
+        self.expect_progress_fraction(5, 5)
+        self.expect_onboarding_fifth_step_visible()
+
+        try:
+            self.expect_onboarding_dismissed(timeout_ms=3_000)
+            return
+        except AssertionError:
+            pass
+
+        heading = self.page.get_by_role("heading", name="Onboarding")
+
+        if heading.is_visible(timeout=1_000):
+            self.click_modal_close_button()
+            try:
+                self.expect_onboarding_dismissed(timeout_ms=12_000)
+                return
+            except AssertionError:
+                pass
+
+        primary = self.modal.get_by_test_id("Modal_Primary_Button")
+        if heading.is_visible(timeout=1_000) and primary.is_visible(timeout=2_000):
+            primary.click(timeout=10_000)
+            try:
+                self.expect_onboarding_dismissed(timeout_ms=12_000)
+                return
+            except AssertionError:
+                pass
+
+        if heading.is_visible(timeout=1_000) and self.continue_btn.is_visible(timeout=2_000):
+            self.continue_btn.click(timeout=10_000)
+            try:
+                self.expect_onboarding_dismissed(timeout_ms=12_000)
+                return
+            except AssertionError:
+                pass
+
         self.close_onboarding_modal()
-        self.expect_onboarding_hidden()
+        self.expect_onboarding_dismissed()
+
+    def close_onboarding_at_step_7(self) -> None:
+        """Alias для теста ТК 459."""
+        self.complete_onboarding_step_7_close()
 
     def click_save_and_continue(self):
         self.save_and_continue_btn.click()
@@ -151,11 +216,21 @@ class OnboardingModal:
         ).to_be_visible(timeout=15_000)
 
     def close_onboarding_modal(self) -> None:
-        """Закрытие последнего шага: явная CTA / primary из дизайн-системы → крестик → Escape.
+        """Закрытие последнего шага: крестик в шапке → CTA → Escape.
 
-        На prod часто меняют приоритет кнопки vs крестика; один только X может не срабатывать
-        (оверлей, pointer-events), поэтому дублируем путь как у других модалок (`Modal_Primary_Button`).
+        Крестик: role=button, aria-label «Закрыть модальное окно», testid=Modal_Close_Icon.
         """
+        if self.close_icon.is_visible(timeout=2_000):
+            try:
+                self.click_modal_close_button()
+                try:
+                    expect(self.modal).to_be_hidden(timeout=5_000)
+                    return
+                except AssertionError:
+                    pass
+            except AssertionError:
+                pass
+
         # Кнопка с доступным именем (i18n / короткие лейблы на финале)
         named_dismiss = self.modal.get_by_role(
             "button",
@@ -175,15 +250,6 @@ class OnboardingModal:
         primary = self.modal.get_by_test_id("Modal_Primary_Button")
         if primary.is_visible(timeout=2_000):
             primary.click(timeout=10_000)
-            try:
-                expect(self.modal).to_be_hidden(timeout=5_000)
-                return
-            except AssertionError:
-                pass
-
-        icon = self.close_icon
-        if icon.is_visible(timeout=3_000):
-            icon.click(timeout=10_000, force=True)
             try:
                 expect(self.modal).to_be_hidden(timeout=5_000)
                 return
@@ -248,7 +314,7 @@ class OnboardingModal:
                 expect(final_copy).to_be_visible(timeout=15_000)
 
         self.close_onboarding_modal()
-        expect(self.modal).to_be_hidden(timeout=25_000)
+        self.expect_onboarding_dismissed()
 
     def try_dismiss_with_escape(self, *, presses: int = 3) -> bool:
         """Быстрый путь: Escape, если модалка не обязательна к прохождению всех шагов."""

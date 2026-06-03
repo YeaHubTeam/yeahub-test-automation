@@ -94,11 +94,13 @@ jobs:
           set -euo pipefail
 
           run_ui_auth_smoke() {
-            echo "UI auth smoke: login TC 409 + register page + change password TC 113"
+            echo "UI auth smoke: login 409 + register form + onboarding 459 + change password 113"
             export APP_BASE_URL="${APP_BASE_URL:-https://app.yeatwork.ru}"
             export CI=true
             uv run pytest -q \
               tests/ui/auth/test_login_email_desktop.py::test_login_with_email_and_password_desktop \
+              tests/ui/auth/test_register_form_desktop.py::test_register_form_desktop \
+              tests/ui/interview/test_onboarding_flow_e2e.py::test_onboarding_after_register_desktop \
               tests/ui/auth/test_register_verify_email_e2e.py::test_register_page_opens \
               tests/ui/settings/test_change_password_desktop.py::test_change_password_settings_desktop \
               --alluredir=allure-results --testit
@@ -116,14 +118,13 @@ jobs:
           }
 
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.scope }}" = "mail" ]; then
-            echo "Running mail e2e (scope=mail): API verify-email + Playwright register→IMAP→onboarding→delete→same-email"
+            echo "Running mail e2e (scope=mail): API verify-email + register→IMAP→delete→same-email + forgot password 115"
             export RUN_MAIL_INTEGRATION=1
             export APP_BASE_URL="${APP_BASE_URL:-https://app.yeatwork.ru}"
             uv run pytest -q \
               tests/auth/test_auth_verify_email_e2e.py::test_email_verification_e2e \
               tests/ui/auth/test_register_verify_email_e2e.py::test_register_and_verify_email_e2e \
               tests/ui/auth/test_forgot_password_recovery_desktop.py::test_forgot_password_recovery_desktop \
-              tests/ui/interview/test_onboarding_flow_e2e.py::test_onboarding_full_flow_e2e \
               --alluredir=allure-results --testit
             exit 0
           fi
@@ -287,7 +288,6 @@ jobs:
             tests/auth/test_auth_verify_email_e2e.py::test_email_verification_e2e \
             tests/ui/auth/test_register_verify_email_e2e.py::test_register_and_verify_email_e2e \
             tests/ui/auth/test_forgot_password_recovery_desktop.py::test_forgot_password_recovery_desktop \
-            tests/ui/interview/test_onboarding_flow_e2e.py::test_onboarding_full_flow_e2e \
             --alluredir=allure-results --testit
 
       - name: Generate Allure HTML report

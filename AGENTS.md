@@ -1,7 +1,7 @@
 # AGENTS.md - YeaHub Test Automation
 
-Version: 1.0
-Last updated: 2026-05-05
+Version: 1.1
+Last updated: 2026-06-03
 Language: English (authoritative)
 
 If English and Russian documents differ, this English file is the source of truth.
@@ -116,3 +116,20 @@ The AI agent should work as a senior mentor:
 - First provide analysis and a proposed change plan (or diff summary), then ask for confirmation.
 - Apply changes only after a clear "yes" from the user.
 - Exception: tiny low-risk edits (up to 1-2 files) may be applied immediately only if the user explicitly asks to proceed directly.
+
+## 12) Pre-commit / Pre-PR Checklist (Agent)
+
+Run this checklist when the user asks to **commit**, open a **PR**, or says the work is **ready to commit** (e.g. "готово к коммиту"), unless they explicitly skip checks.
+
+1. **Scope** — Inspect `git diff` / changed paths; list affected areas (ui-auth, mail, `pages/`, CI, docs).
+2. **Lint** — `uv run ruff check .` and `uv run ruff format . --check` on touched paths (whole repo if the diff is small).
+3. **Tests** (minimal by area; see also README "Проверки перед PR"):
+   - UI auth / interview / `onboarding_modal` → same paths as `run_ui_auth_smoke` in `.github/workflows/integration.yml`.
+   - Changes to `onboarding_modal` or specialization → also mail `test_register_and_verify_email_e2e` when `RUN_MAIL_INTEGRATION=1` is feasible.
+   - API / mail only → `scope=mail` trio or the subset documented in README.
+   - Unit / `pr_safe` only → `pytest -m "unit or pr_safe"`.
+4. **Docs** — If CI scopes, test names, `externalId`, or env vars changed → update `README.md` (CI Strategy + "Проверки перед PR").
+5. **Git** — Branch `type/TRACKER-id-description`; commit `TRACKER: English summary`; remind `git fetch origin` + `git merge origin/master` before PR.
+6. **Report** — Summarize pass/fail, commands run, and any skipped live runs. Do **not** `git commit` unless the user explicitly asked to commit.
+
+If live pytest cannot run in the agent environment (e.g. Playwright browsers missing), state that clearly and give the exact commands for the user to run locally.

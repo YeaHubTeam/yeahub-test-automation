@@ -1,99 +1,114 @@
-"""E2E онбординга после регистрации с почтой (связь с ручным кейсом в Test IT — workItemIds)."""
+"""Онбординг после регистрации (desktop), Test IT [459](https://team-vz1y.testit.software/browse/459).
 
-import os
-import re
+Предусловия: API signUp (`registered_user`) + UI login → /interview, модалка 1/5.
+Шаги 1–7: онбординг до закрытия модалки. Специализация — эталон React Frontend Developer.
+Teardown: удаление пользователя через fixture `registered_user`.
+"""
+
+from typing import Any
 
 import allure
 import pytest
 import testit
-from playwright.sync_api import Page, expect
+from playwright.sync_api import Page
 
-from api.api_manager import ApiManager
 from pages.auth.login_page import LoginPage
-from pages.interview.interview_page import INTERVIEW_URL_RE, InterviewPage
-from pages.layout.user_menu import UserMenu
-from tests.mail.verification_flow import (
-    assert_profile_specialization_selected,
-    delete_authenticated_user_via_api,
-)
-from tests.ui.flows.register_mail_interview_flow import (
-    new_plus_tagged_email,
-    register_ui_through_interview_first_continue,
-    require_mail_creds,
-    verify_email_via_imap_after_first_onboarding_continue,
-)
+from pages.interview.interview_page import InterviewPage
+from utils.reporting import report_step
 
 
 @pytest.mark.ui
 @pytest.mark.integration
 @pytest.mark.regression
+@pytest.mark.critical
 @allure.epic("UI")
 @allure.feature("Interview")
 @allure.story("Onboarding")
-@allure.title("Onboarding 1/5–5/5 → постусловия → удаление (e2e)")
+@allure.title("Онбординг после регистрации (desktop)")
 @allure.severity(allure.severity_level.CRITICAL)
 @allure.label("component", "interview")
 @testit.workItemIds("608dd8ae-b3fa-4103-a9db-2b86c3cbe5ef")
-@testit.externalId(
-    "yeahub-ui-onboarding-flow-tc-147"
-)  # id автотеста в библиотеке TMS; не путать с номером ручного кейса
-@testit.title("Onboarding full flow (E2E)")
-@pytest.mark.skipif(
-    os.getenv("RUN_MAIL_INTEGRATION") != "1",
-    reason="Run with RUN_MAIL_INTEGRATION=1 to execute the live mail flow",
+@testit.externalId("yeahub-ui-interview-onboarding-after-register-desktop-459")
+@testit.title("Онбординг после регистрации (desktop)")
+@testit.description(
+    "Ручной ТК 459: предусловия API signUp + UI login; шаги 1–7 онбординга. "
+    "Специализация: React Frontend Developer (id=11). "
+    "Teardown: registered_user → delete_user. Verify email — отдельные mail-тесты."
 )
-def test_onboarding_full_flow_e2e(page: Page, api_manager: ApiManager):
-    with allure.step("Preconditions: mail creds (как auth e2e)"):
-        require_mail_creds()
+def test_onboarding_after_register_desktop(page: Page, registered_user: dict[str, Any]):
+    """Онбординг после регистрации (desktop)."""
+    email = registered_user["email"]
+    password = registered_user["password"]
+    username = registered_user["username"]
 
-    started_at, _tag, recipient_email, password, username = new_plus_tagged_email()
+    login_page = LoginPage(page)
+    interview_page = InterviewPage(page)
+    onboarding = interview_page.onboarding
 
-    with allure.step(
-        "Register via UI → interview → onboarding step 1 (как auth e2e + проверка 1/5)"
+    with report_step(
+        "Предусловие 1–2: пользователь зарегистрирован (API), вход → /interview",
+        "signUp 201 (fixture registered_user); после входа URL /interview, пользователь авторизован",
     ):
-        interview = register_ui_through_interview_first_continue(
-            page,
-            username,
-            recipient_email,
-            password,
-            expect_tc_step1_progress=True,
-        )
-        onboarding = interview.onboarding
+        login_page.open()
+        login_page.fill_credentials(email, password)
+        login_page.submit()
+        interview_page.expect_authorized_after_login(username=username)
 
-    with allure.step("IMAP + verify (сразу после первого Continue — как auth e2e)"):
-        verify_email_via_imap_after_first_onboarding_continue(
-            api_manager,
-            recipient_email=recipient_email,
-            password=password,
-            started_at=started_at,
-        )
+    with report_step(
+        "Предусловие 3: модалка онбординга, этап «Приветствие» (1/5)",
+        "Модалка Onboarding видна; прогресс 1/5; пользователь ранее не проходил онбординг",
+    ):
+        onboarding.expect_onboarding_visible()
+        onboarding.expect_progress_fraction(1, 5)
 
-    with allure.step("После verify: шаг 2/5 и шаги модалки 2–7"):
+    with report_step(
+        "Шаг 1: «Продолжить» на «Приветствие»",
+        "Прогресс 2/5; экран «Выбор специализации» (dropdown-select, текст про специализацию)",
+    ):
+        onboarding.click_continue()
         onboarding.expect_progress_fraction(2, 5)
         onboarding.expect_onboarding_second_step_visible()
-        onboarding.complete_tc_steps_2_through_7()
 
-    with allure.step("Post: stay on interview URL (no forced redirect off interview)"):
-        expect(page).to_have_url(INTERVIEW_URL_RE)
+    with report_step(
+        "Шаг 2: открыть список «Выберите специализацию»",
+        "Открыт выпадающий список; виден хотя бы один вариант специализации (role=option)",
+    ):
+        onboarding.open_specialization_dropdown()
+        onboarding.expect_specialization_list_visible()
 
-    with allure.step("Post 1: reload — onboarding does not reappear"):
-        page.reload(wait_until="domcontentloaded")
-        onboarding.expect_onboarding_hidden(timeout_ms=20_000)
+    with report_step(
+        "Шаг 3: выбрать специализацию (эталон: React Frontend Developer)",
+        "В поле выбрана специализация React Frontend Developer (id=11)",
+    ):
+        onboarding.choose_reference_specialization()
 
-    with allure.step("Post 2: Profile → Interview — onboarding does not reappear"):
-        interview.open_profile_via_nav_link()
-        interview.open_interview_via_nav_link()
-        onboarding.expect_onboarding_hidden(timeout_ms=15_000)
+    with report_step(
+        "Шаг 4: «Сохранить и продолжить»",
+        "Прогресс 3/5; экран «Подготовка к собеседованиям»; кнопка «Продолжить» видна",
+    ):
+        onboarding.click_save_and_continue()
+        onboarding.expect_progress_fraction(3, 5)
+        onboarding.expect_onboarding_third_step_visible()
 
-    with allure.step("Post 3: logout → login — no onboarding, specialization persisted (API)"):
-        UserMenu(page).logout_via_profile_menu()
-        login_page = LoginPage(page)
-        login_page.open()
-        login_page.fill_credentials(recipient_email, password)
-        login_page.submit()
-        expect(page).to_have_url(INTERVIEW_URL_RE, timeout=30_000)
-        onboarding.expect_onboarding_hidden(timeout_ms=20_000)
-        assert_profile_specialization_selected(api_manager, recipient_email, password)
+    with report_step(
+        "Шаг 5: «Продолжить»",
+        "Прогресс 4/5; экран про подписку/развитие; кнопки «Поддержать» и «Позже» видны",
+    ):
+        onboarding.click_continue()
+        onboarding.expect_progress_fraction(4, 5)
+        onboarding.expect_onboarding_fourth_step_visible()
 
-    with allure.step("Post 4: delete user via API (сценарий допускает teardown через API)"):
-        delete_authenticated_user_via_api(api_manager, recipient_email, password)
+    with report_step(
+        "Шаг 6: «Позже»",
+        "Прогресс 5/5; финальный экран («YeaHub становится лучше» / благодарность)",
+    ):
+        onboarding.click_later_btn()
+        onboarding.expect_progress_fraction(5, 5)
+        onboarding.expect_onboarding_fifth_step_visible()
+
+    with report_step(
+        "Шаг 7: закрыть модалку (крестик)",
+        "Модалка онбординга закрыта; URL /interview; заголовок Onboarding и stepper скрыты",
+    ):
+        onboarding.complete_onboarding_step_7_close()
+        interview_page.expect_on_interview_route()
