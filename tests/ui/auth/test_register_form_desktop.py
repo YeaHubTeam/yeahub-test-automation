@@ -2,7 +2,7 @@
 
 Ручной кейс Test IT: workItem `519e37ac-bda7-45c1-aebc-683755c6ecbd`.
 Покрывает шаги 1–9 (форма, согласия, редирект на /interview, модалка Onboarding).
-Письмо Verify Your Email — отдельный mail/integration сценарий (см. test_register_and_verify_email_e2e).
+Письмо Verify Your Email — ТК 422 (`test_email_verify_desktop`) или полный e2e (`test_register_and_verify_email_e2e`).
 
 Teardown: удаление пользователя через API.
 

@@ -126,7 +126,7 @@ Run this checklist when the user asks to **commit**, open a **PR**, or says the 
 3. **Tests** (minimal by area; see also README "Проверки перед PR"):
    - UI auth / interview / `onboarding_modal` → same paths as `run_ui_auth_smoke` in `.github/workflows/integration.yml`.
    - Changes to `onboarding_modal` or specialization → also mail `test_register_and_verify_email_e2e` when `RUN_MAIL_INTEGRATION=1` is feasible.
-   - API / mail only → `scope=mail` trio or the subset documented in README.
+   - API / mail only → `scope=mail` quartet (466, 422, register→IMAP 52, 115) or the subset documented in README.
    - Unit / `pr_safe` only → `pytest -m "unit or pr_safe"`.
 4. **Docs** — If CI scopes, test names, `externalId`, or env vars changed → update `README.md` (CI Strategy + "Проверки перед PR").
 5. **Git** — Branch `type/TRACKER-id-description`; commit `TRACKER: English summary`; remind `git fetch origin` + `git merge origin/master` before PR.

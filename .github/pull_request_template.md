@@ -24,14 +24,19 @@ uv run pytest tests/ui/auth/test_login_email_desktop.py::test_login_with_email_a
   tests/ui/settings/test_change_password_desktop.py::test_change_password_settings_desktop -v
 ```
 
-Mail + forgot password ТК 115 (нужны `MAIL_*` в `.env`, `RUN_MAIL_INTEGRATION=1`):
+Mail (нужны `MAIL_*` в `.env`, `RUN_MAIL_INTEGRATION=1`):
 
 ```bash
+# ТК 422 — email verify в settings (~1.5–2 min)
+RUN_MAIL_INTEGRATION=1 uv run pytest \
+  tests/ui/auth/test_email_verify_desktop.py::test_email_verify_registered_user_desktop -v
+
+# ТК 115 — forgot password
 RUN_MAIL_INTEGRATION=1 uv run pytest \
   tests/ui/auth/test_forgot_password_recovery_desktop.py::test_forgot_password_recovery_desktop -v
 ```
 
-Полный mail-контур (как `scope=mail` / nightly **mail-e2e**): см. [README — CI Strategy](README.md#ci-strategy).
+Полный mail-контур (как `scope=mail` / nightly **mail-e2e**): см. [README — Проверки перед PR](README.md#проверки-перед-pr) и [CI Strategy](README.md#ci-strategy).
 
 UI payment (нужны `VERIFIED_USER_*`):
 

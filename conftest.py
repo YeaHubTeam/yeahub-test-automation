@@ -1,4 +1,5 @@
 import time
+from datetime import datetime, timezone
 
 import pytest
 import requests
@@ -12,6 +13,7 @@ from models.Subscriptions.model_subscription import ModelSubscriptionResponse
 from models.Subscriptions.model_user_subsriptions import UserSubscriptionResponse
 from resources.user_creds import VerifiedUserCreds
 from tests.mail.verification_flow import (
+    assert_profile_not_verified,
     authenticate_for_teardown,
     profile_user_id,
     verify_api_registered_user_email,
@@ -121,6 +123,44 @@ def registered_user(api_manager, test_user):
 
     test_user["id"] = last_response.json().get("user", {}).get("id")
     test_user["token"] = last_response.json().get("access_token")
+    yield test_user
+    _delete_user_try_passwords(
+        api_manager,
+        email=test_user["email"],
+        user_id=test_user.get("id"),
+        password=test_user["password"],
+        active_password=test_user.get("active_password"),
+    )
+
+
+@pytest.fixture
+def unverified_mail_registered_user(api_manager, test_user):
+    """API signUp на MAIL_EMAIL+tag, isVerified=false. Для UI ТК 422 (IMAP verify)."""
+    require_mail_creds()
+    _started_at, _tag, recipient_email, password, username = new_plus_tagged_email()
+    test_user["email"] = recipient_email
+    test_user["password"] = password
+    test_user["username"] = username
+    last_response = None
+    for attempt in range(5):
+        last_response = api_manager.auth_api.register_user(
+            test_user, expected_status=[201, 503, 409]
+        )
+        if last_response.status_code == 201:
+            break
+        _started_at, _tag, recipient_email, password, username = new_plus_tagged_email()
+        test_user["email"] = recipient_email
+        test_user["password"] = password
+        test_user["username"] = username
+        time.sleep(2 * (attempt + 1))
+
+    assert last_response is not None
+    assert last_response.status_code == 201, "signUp is unavailable (503) after retries"
+
+    test_user["id"] = last_response.json().get("user", {}).get("id")
+    test_user["token"] = last_response.json().get("access_token")
+    test_user["mail_since"] = datetime.now(timezone.utc)
+    assert_profile_not_verified(api_manager, test_user["email"], test_user["password"])
     yield test_user
     _delete_user_try_passwords(
         api_manager,

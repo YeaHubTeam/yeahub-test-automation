@@ -133,8 +133,8 @@ uv run pytest --collect-only
 - `scope=full` и ночной прогон (`schedule`) основного job: `pytest -m "integration and not ui"`, затем UI auth smoke (как `scope=ui-auth`: login ТК 409, register form, onboarding ТК 459, register page opens, change password ТК 113) и UI payment (если заданы `VERIFIED_USER_*`)
 - `scope=ui-auth`: Playwright auth/interview smoke — login (ТК 409), `test_register_form_desktop`, `test_onboarding_after_register_desktop` (ТК 459), `test_register_page_opens`, change password (ТК 113; `registered_user`, без IMAP) (`--testit`, `APP_BASE_URL` по умолчанию `https://app.yeatwork.ru`)
 - `scope=ui-payment`: Playwright `tests/ui/subscription/test_subscription_payment_ui.py` (нужны secrets `VERIFIED_USER_EMAIL`, `VERIFIED_USER_PASSWORD`)
-- `scope=mail`: API `test_email_verification_e2e` + Playwright register/verify + **forgot password recovery (ТК 115)** с `RUN_MAIL_INTEGRATION=1`, `--testit`, `APP_BASE_URL` по умолчанию `https://app.yeatwork.ru` (тайминги same-email для регистрационного e2e — дефолты в коде, как при локальном запуске). Онбординг ТК 459 — в `scope=ui-auth`.
-- ночной job **mail-e2e** (только `schedule`): те же **три** mail-теста, что и при `scope=mail` (API verify-email, register→IMAP, forgot password ТК 115), плюс `MAIL_*` secrets и установка Chromium для Playwright
+- `scope=mail`: API verify-email (ТК 466) + UI email verify (ТК 422) + Playwright register→IMAP (52) + **forgot password (ТК 115)** с `RUN_MAIL_INTEGRATION=1`, `--testit`, `APP_BASE_URL` по умолчанию `https://app.yeatwork.ru` (тайминги same-email для регистрационного e2e — дефолты в коде, как при локальном запуске). Онбординг ТК 459 — в `scope=ui-auth`.
+- ночной job **mail-e2e** (только `schedule`): те же mail-тесты, что и при `scope=mail` (API verify-email 466, UI email verify 422, register→IMAP, forgot password 115), плюс `MAIL_*` secrets и Chromium для Playwright
 - перед тестами выполняется preflight API healthcheck (`/subscriptions` + доступность `/auth/refresh`)
 - после каждого manual/nightly run сохраняются artifacts `allure-results-<run_number>` и `allure-report-<run_number>`
 
@@ -262,7 +262,7 @@ CI (Integration workflow, scope `ui-auth` или ночной `schedule` / `scop
 
 ### UI E2E (Playwright): регистрация — форма и submit (desktop, ТК 477)
 
-Автотест `tests/ui/auth/test_register_form_desktop.py` — ручной кейс [477](https://team-vz1y.testit.software/browse/477), **шаги 1–9**: `/auth/register`, заполнение полей, согласия, «Зарегистрироваться» → `/interview`, модалка Onboarding **без** прохождения онбординга. Email: `MAIL_EMAIL` + tag. Письмо Verify Your Email — `test_register_and_verify_email_e2e` (scope `mail`). Teardown: удаление пользователя через API.
+Автотест `tests/ui/auth/test_register_form_desktop.py` — ручной кейс [477](https://team-vz1y.testit.software/browse/477), **шаги 1–9**: `/auth/register`, заполнение полей, согласия, «Зарегистрироваться» → `/interview`, модалка Onboarding **без** прохождения онбординга. Email: `MAIL_EMAIL` + tag. Письмо Verify Your Email — ТК 422 (`test_email_verify_desktop`, scope `mail`) или полный e2e 52. Teardown: удаление пользователя через API.
 
 ```bash
 uv run pytest tests/ui/auth/test_register_form_desktop.py::test_register_form_desktop -v
@@ -285,6 +285,17 @@ uv run pytest tests/ui/interview/test_onboarding_flow_e2e.py::test_onboarding_af
 ```
 
 С браузером: `--headed`. Test IT: `--testit`, `externalId`: `yeahub-ui-interview-onboarding-after-register-desktop-459`. CI: `scope=ui-auth` (не `scope=mail`).
+
+### UI E2E (Playwright): подтверждение email в настройках (desktop, ТК 422)
+
+Автотест `tests/ui/auth/test_email_verify_desktop.py` — [422](https://team-vz1y.testit.software/browse/422): API signUp (неподтверждённый, `MAIL_EMAIL` + tag) → UI login → `/interview` → онбординг 1/5–5/5 (техн., если мешает) → верификация: CTA «Подтвердить e-mail» в шапке **или** прямой `/settings#email-verify` (на stage CTA после API signUp часто нет) → reload → «Подтвердить» (при rate limit после signUp — пауза/повтор; письмо ищем в IMAP с `mail_since`, при необходимости API resend) → ссылка из IMAP в новой вкладке → «Почта успешно подтверждена». Teardown — удаление пользователя через API.
+
+```bash
+RUN_MAIL_INTEGRATION=1 uv run pytest \
+  tests/ui/auth/test_email_verify_desktop.py::test_email_verify_registered_user_desktop -v
+```
+
+С браузером: `--headed`. Test IT: `--testit`, `externalId`: `yeahub-ui-auth-email-verify-desktop-422` (длинный прогон ~1.5–2 мин — локальный Sync Storage при `--testit` может оборваться раньше теста; pytest при этом зелёный). CI: `scope=mail` или nightly **mail-e2e**.
 
 ### UI E2E (Playwright): восстановление пароля через письмо (desktop, ТК 115)
 
@@ -446,7 +457,19 @@ uv run pre-commit run --all-files
   ```
 
 - при изменениях в `pages/interview/onboarding_modal.py` (специализация, закрытие модалки) дополнительно: `test_register_and_verify_email_e2e` с `RUN_MAIL_INTEGRATION=1`
-- для ТК 115 (forgot password): `RUN_MAIL_INTEGRATION=1` и `tests/ui/auth/test_forgot_password_recovery_desktop.py`; полный mail-контур — `scope=mail` в Integration CI
+- для ТК 422 (email verify в settings): `RUN_MAIL_INTEGRATION=1` и `tests/ui/auth/test_email_verify_desktop.py::test_email_verify_registered_user_desktop` (или полный mail-контур ниже)
+- для ТК 115 (forgot password): `RUN_MAIL_INTEGRATION=1` и `tests/ui/auth/test_forgot_password_recovery_desktop.py`
+- полный mail-контур (как `scope=mail` / nightly **mail-e2e** в Integration CI):
+
+  ```bash
+  export RUN_MAIL_INTEGRATION=1
+  export APP_BASE_URL="${APP_BASE_URL:-https://app.yeatwork.ru}"
+  uv run pytest -q \
+    tests/auth/test_auth_verify_email_e2e.py::test_email_verification_e2e \
+    tests/ui/auth/test_email_verify_desktop.py::test_email_verify_registered_user_desktop \
+    tests/ui/auth/test_register_verify_email_e2e.py::test_register_and_verify_email_e2e \
+    tests/ui/auth/test_forgot_password_recovery_desktop.py::test_forgot_password_recovery_desktop
+  ```
 - при изменениях в live-контуре дополнительно прогнать `smoke and integration` вручную
 - ветка обновлена через `merge origin/master`
 - новые зависимости добавлены в `pyproject.toml` и `uv.lock`

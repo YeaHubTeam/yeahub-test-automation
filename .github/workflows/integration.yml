@@ -118,11 +118,12 @@ jobs:
           }
 
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.scope }}" = "mail" ]; then
-            echo "Running mail e2e (scope=mail): API verify-email + register→IMAP→delete→same-email + forgot password 115"
+            echo "Running mail e2e (scope=mail): API verify-email + UI email verify 422 + register→IMAP + forgot 115"
             export RUN_MAIL_INTEGRATION=1
             export APP_BASE_URL="${APP_BASE_URL:-https://app.yeatwork.ru}"
             uv run pytest -q \
               tests/auth/test_auth_verify_email_e2e.py::test_email_verification_e2e \
+              tests/ui/auth/test_email_verify_desktop.py::test_email_verify_registered_user_desktop \
               tests/ui/auth/test_register_verify_email_e2e.py::test_register_and_verify_email_e2e \
               tests/ui/auth/test_forgot_password_recovery_desktop.py::test_forgot_password_recovery_desktop \
               --alluredir=allure-results --testit
@@ -198,8 +199,8 @@ jobs:
         run: exit 1
 
   mail-e2e:
-    # Nightly: API verify-email + Playwright register→IMAP + forgot password (TC 115) + onboarding (same-email timing defaults in code).
-    # Manual scope=mail runs the same four tests in integration-tests (this job is schedule-only).
+    # Nightly: API verify-email 466 + UI email verify 422 + register→IMAP e2e + forgot password 115.
+    # Manual scope=mail runs the same tests in integration-tests (this job is schedule-only).
     if: ${{ github.event_name == 'schedule' }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -286,6 +287,7 @@ jobs:
           set -euo pipefail
           uv run pytest -q \
             tests/auth/test_auth_verify_email_e2e.py::test_email_verification_e2e \
+            tests/ui/auth/test_email_verify_desktop.py::test_email_verify_registered_user_desktop \
             tests/ui/auth/test_register_verify_email_e2e.py::test_register_and_verify_email_e2e \
             tests/ui/auth/test_forgot_password_recovery_desktop.py::test_forgot_password_recovery_desktop \
             --alluredir=allure-results --testit
