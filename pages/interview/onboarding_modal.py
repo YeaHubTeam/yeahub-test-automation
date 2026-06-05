@@ -274,10 +274,16 @@ class OnboardingModal:
 
         progress_1 = self.modal.get_by_text(re.compile(r"1\s*/\s*5|1\s+of\s+5", re.I)).first
         if progress_1.is_visible(timeout=3_000) and self.continue_btn.is_visible(timeout=2_000):
+            expect(self.continue_btn).to_be_enabled(timeout=5_000)
             self.click_continue()
+            expect(
+                self.modal.get_by_text(re.compile(r"2\s*/\s*5|2\s+of\s+5", re.I)).first
+            ).to_be_visible(timeout=15_000)
 
         if self.modal.get_by_test_id("dropdown-select").is_visible(timeout=5_000):
-            self.open_drop_down_and_choose_specialization()
+            self.open_specialization_dropdown()
+            self.expect_specialization_list_visible()
+            self.choose_reference_specialization()
             self.click_save_and_continue()
 
         # Шаг 3: заголовок часто не в <h*> — ищем фрагменты копирайта внутри модалки.

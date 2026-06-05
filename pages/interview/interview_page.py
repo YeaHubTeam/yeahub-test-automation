@@ -57,11 +57,20 @@ class InterviewPage:
         )
 
     def complete_onboarding_if_blocking_interview(self) -> None:
-        """Онбординг после signUp/login: Escape не закрывает — проходим 1/5–5/5 и крестик."""
-        if not self.onboarding.modal.is_visible(timeout=5_000):
-            return
-        self.onboarding.complete_onboarding_through_close()
-        self.onboarding.expect_onboarding_dismissed()
+        """Онбординг после signUp/login: ждём модалку (SPA иногда рисует с задержкой), проходим 1/5–5/5."""
+        onboarding = self.onboarding
+        if not onboarding.modal.is_visible(timeout=15_000):
+            if not self.page.get_by_role("heading", name="Onboarding").is_visible(timeout=2_000):
+                return
+        onboarding.complete_onboarding_through_close()
+        onboarding.expect_onboarding_dismissed()
+
+    def ensure_onboarding_completed_before_settings(self) -> None:
+        """Перед переходом в settings: онбординг на /interview или повторно после навигации."""
+        self.complete_onboarding_if_blocking_interview()
+        if self.onboarding.modal.is_visible(timeout=1_000):
+            self.onboarding.complete_onboarding_through_close()
+            self.onboarding.expect_onboarding_dismissed()
 
     def prepare_interview_after_login(self) -> None:
         """Тренажёр + онбординг 1/5–5/5 (без ожидания CTA в шапке — на stage его может не быть)."""

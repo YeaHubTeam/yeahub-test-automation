@@ -38,11 +38,19 @@ RUN_MAIL_INTEGRATION=1 uv run pytest \
 
 Полный mail-контур (как `scope=mail` / nightly **mail-e2e**): см. [README — Проверки перед PR](README.md#проверки-перед-pr) и [CI Strategy](README.md#ci-strategy).
 
-UI payment (нужны `VERIFIED_USER_*`):
+UI payment — API link (`VERIFIED_USER_*` в `.env` или secrets):
 
 ```bash
 uv run pytest tests/ui/subscription/test_subscription_payment_ui.py -v
 ```
+
+UI payment — ТК 116, полный checkout (`MAIL_*` в `.env`, `RUN_MAIL_INTEGRATION=1`):
+
+```bash
+RUN_MAIL_INTEGRATION=1 uv run pytest tests/ui/subscription/test_subscription_tariff_card_desktop.py -v
+```
+
+Integration `scope=ui-payment`: нужны оба набора — `VERIFIED_USER_*` и `MAIL_*`.
 
 ## Чеклист
 - [ ] Линтер пройден (`ruff check .` и `ruff format --check .`)

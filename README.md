@@ -132,16 +132,16 @@ uv run pytest --collect-only
 - `scope=smoke` запускает `pytest -m "smoke and integration and not ui"` (без Playwright UI)
 - `scope=full` и ночной прогон (`schedule`) основного job: `pytest -m "integration and not ui"`, затем UI auth smoke (как `scope=ui-auth`: login ТК 409, register form, onboarding ТК 459, register page opens, change password ТК 113) и UI payment (если заданы `VERIFIED_USER_*`)
 - `scope=ui-auth`: Playwright auth/interview smoke — login (ТК 409), `test_register_form_desktop`, `test_onboarding_after_register_desktop` (ТК 459), `test_register_page_opens`, change password (ТК 113; `registered_user`, без IMAP) (`--testit`, `APP_BASE_URL` по умолчанию `https://app.yeatwork.ru`)
-- `scope=ui-payment`: Playwright `tests/ui/subscription/test_subscription_payment_ui.py` (нужны secrets `VERIFIED_USER_EMAIL`, `VERIFIED_USER_PASSWORD`)
+- `scope=ui-payment`: `test_subscription_payment_ui.py` (`VERIFIED_USER_*`) + `test_subscription_tariff_card_desktop.py` (ТК 116; `RUN_MAIL_INTEGRATION=1`, `MAIL_*`)
 - `scope=mail`: API verify-email (ТК 466) + UI email verify (ТК 422) + Playwright register→IMAP (52) + **forgot password (ТК 115)** с `RUN_MAIL_INTEGRATION=1`, `--testit`, `APP_BASE_URL` по умолчанию `https://app.yeatwork.ru` (тайминги same-email для регистрационного e2e — дефолты в коде, как при локальном запуске). Онбординг ТК 459 — в `scope=ui-auth`.
 - ночной job **mail-e2e** (только `schedule`): те же mail-тесты, что и при `scope=mail` (API verify-email 466, UI email verify 422, register→IMAP, forgot password 115), плюс `MAIL_*` secrets и Chromium для Playwright
 - перед тестами выполняется preflight API healthcheck (`/subscriptions` + доступность `/auth/refresh`)
 - после каждого manual/nightly run сохраняются artifacts `allure-results-<run_number>` и `allure-report-<run_number>`
 
 Для `Integration CI` в GitHub Actions должны быть заведены repository secrets:
-- `VERIFIED_USER_EMAIL`
-- `VERIFIED_USER_PASSWORD`
-- для mail / nightly mail-e2e: `MAIL_HOST`, `MAIL_PORT`, `MAIL_EMAIL`, `MAIL_PASSWORD`, `MAIL_FOLDER` (и при использовании Test IT — `TMS_*`, см. workflow)
+- `VERIFIED_USER_EMAIL`, `VERIFIED_USER_PASSWORD` — UI payment по API-ссылке (`test_subscription_payment_ui.py`)
+- `MAIL_HOST`, `MAIL_PORT`, `MAIL_EMAIL`, `MAIL_PASSWORD`, `MAIL_FOLDER` — mail e2e, nightly **mail-e2e** и ТК 116 (`test_subscription_tariff_card_desktop.py`); для `scope=ui-payment` нужны **оба** набора (`VERIFIED_USER_*` + `MAIL_*`)
+- при использовании Test IT — `TMS_*` (см. workflow)
 
 Artifacts доступны на странице конкретного workflow run в GitHub Actions.
 
@@ -322,11 +322,16 @@ uv run pytest tests/ui/settings/test_change_password_desktop.py::test_change_pas
 
 `tests/ui/subscription/test_subscription_payment_ui.py` — UI оплаты по ссылке из API (`static_user` / `VERIFIED_USER_*` в secrets).
 
+`tests/ui/subscription/test_subscription_tariff_card_desktop.py` — ТК 116: signUp + IMAP verify → тариф в settings → модалка → T-Bank → активная подписка (`verified_registered_user`, teardown delete user).
+
 ```bash
 uv run pytest tests/ui/subscription/test_subscription_payment_ui.py -v
+RUN_MAIL_INTEGRATION=1 uv run pytest tests/ui/subscription/test_subscription_tariff_card_desktop.py -v --headed
 ```
 
-CI: Integration workflow, scope `ui-payment` (или ночной `schedule` / `scope=full` после auth smoke, если заданы `VERIFIED_USER_*`).
+Test IT: `--testit`, `externalId`: `yeahub-ui-subscription-tariff-card-desktop-116`. Для 116 нужны `MAIL_*` в `.env` (как mail e2e).
+
+CI: Integration workflow, scope `ui-payment` — API-link smoke: `VERIFIED_USER_*`; ТК 116: `MAIL_*` + `RUN_MAIL_INTEGRATION=1`.
 
 ### UI E2E (Playwright): регистрация в браузере → IMAP → онбординг → удаление → опционально тот же email
 
@@ -459,6 +464,7 @@ uv run pre-commit run --all-files
 - при изменениях в `pages/interview/onboarding_modal.py` (специализация, закрытие модалки) дополнительно: `test_register_and_verify_email_e2e` с `RUN_MAIL_INTEGRATION=1`
 - для ТК 422 (email verify в settings): `RUN_MAIL_INTEGRATION=1` и `tests/ui/auth/test_email_verify_desktop.py::test_email_verify_registered_user_desktop` (или полный mail-контур ниже)
 - для ТК 115 (forgot password): `RUN_MAIL_INTEGRATION=1` и `tests/ui/auth/test_forgot_password_recovery_desktop.py`
+- для ТК 116 (оплата подписки через UI, tariff card): `RUN_MAIL_INTEGRATION=1`, `MAIL_*` в `.env` и `tests/ui/subscription/test_subscription_tariff_card_desktop.py` (~1–2 min)
 - полный mail-контур (как `scope=mail` / nightly **mail-e2e** в Integration CI):
 
   ```bash
