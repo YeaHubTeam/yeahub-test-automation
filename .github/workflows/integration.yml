@@ -94,7 +94,7 @@ jobs:
           set -euo pipefail
 
           run_ui_auth_smoke() {
-            echo "UI auth smoke: login 409 + register form + onboarding 459 + change password 113"
+            echo "UI auth smoke: login 409 + register form + onboarding 459 + change password 113 + delete account 117"
             export APP_BASE_URL="${APP_BASE_URL:-https://app.yeatwork.ru}"
             export CI=true
             uv run pytest -q \
@@ -103,6 +103,7 @@ jobs:
               tests/ui/interview/test_onboarding_flow_e2e.py::test_onboarding_after_register_desktop \
               tests/ui/auth/test_register_verify_email_e2e.py::test_register_page_opens \
               tests/ui/settings/test_change_password_desktop.py::test_change_password_settings_desktop \
+              tests/ui/settings/test_delete_account_desktop.py::test_delete_account_from_settings_desktop \
               --alluredir=allure-results --testit
           }
 

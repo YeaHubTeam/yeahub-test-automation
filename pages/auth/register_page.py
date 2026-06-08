@@ -61,6 +61,19 @@ class RegisterPage:
     def expect_submit_enabled(self) -> None:
         expect(self.submit_button).to_be_enabled()
 
+    def click_login_link(self) -> None:
+        """ТК 117 шаг 6: «Уже есть аккаунт?» → «Войти» → /auth/login."""
+        login_link = (
+            self.page.locator('a[data-testid="Button"]')
+            .filter(has_text=re.compile(r"^\s*Войти\s*$|^Log\s*in$", re.I))
+            .first.or_(
+                self.page.get_by_role("link", name=re.compile(r"^Войти$|^Log\s*in$", re.I)).first
+            )
+        )
+        expect(login_link).to_be_visible(timeout=10_000)
+        login_link.click()
+        expect(self.page).to_have_url(re.compile(r".*/auth/login", re.I), timeout=20_000)
+
     def open_with_clean_session(self) -> None:
         """После logout/удаления аккаунта: cookies + web storage, иначе повторная регистрация часто остаётся на /auth/register."""
         self.page.context.clear_cookies()

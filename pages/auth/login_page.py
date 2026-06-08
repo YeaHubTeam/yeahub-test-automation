@@ -112,6 +112,39 @@ class LoginPage:
     def submit(self) -> None:
         self.page.get_by_role("button", name=re.compile(r"Войти|Вход|Sign\s*in", re.I)).click()
 
+    def submit_expecting_unauthorized(self) -> None:
+        """ТК 117 шаг 7: login удалённого пользователя → HTTP 401/403, остаёмся на /auth/login."""
+        with self.page.expect_response(
+            lambda r: "/auth/login" in r.url and r.request.method == "POST",
+            timeout=20_000,
+        ) as resp_info:
+            self.submit()
+        status = resp_info.value.status
+        assert status in (401, 403), f"Expected login failure HTTP 401/403, got {status}"
+        self.expect_still_on_login_after_failed_attempt()
+
+    def expect_still_on_login_after_failed_attempt(self) -> None:
+        expect(self.page).to_have_url(re.compile(r".*/auth/login", re.I), timeout=15_000)
+        expect(self.page).not_to_have_url(re.compile(r".*/interview", re.I), timeout=5_000)
+        self.expect_login_form_elements_visible()
+
+    def expect_login_failed(self) -> None:
+        """Ошибка входа: остаёмся на login; при наличии — toast/текст ошибки."""
+        self.expect_still_on_login_after_failed_attempt()
+        error = self.page.get_by_text(
+            re.compile(
+                r"неверн.*парол|неверный\s+логин|invalid\s+credential|"
+                r"wrong\s+password|authentication\s+failed|"
+                r"не\s+удалось\s+войти|ошибк.*авториз|"
+                r"public_unauthorized|auth\.auth\.|unauthorized",
+                re.I,
+            )
+        ).first
+        if error.is_visible(timeout=2_000):
+            return
+        toast = self.page.locator('[data-testid*="Toast"], [role="alert"]').first
+        expect(toast).to_be_visible(timeout=2_000)
+
     def click_forgot_password(self) -> None:
         """Шаг 2 ТК 115: «Забыли пароль?» → /auth/forgot-password."""
         forgot_pw = (

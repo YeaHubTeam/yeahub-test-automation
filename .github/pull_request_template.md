@@ -21,7 +21,8 @@ UI auth smoke (Integration `scope=ui-auth` или локально):
 ```bash
 uv run pytest tests/ui/auth/test_login_email_desktop.py::test_login_with_email_and_password_desktop \
   tests/ui/auth/test_register_verify_email_e2e.py::test_register_page_opens \
-  tests/ui/settings/test_change_password_desktop.py::test_change_password_settings_desktop -v
+  tests/ui/settings/test_change_password_desktop.py::test_change_password_settings_desktop \
+  tests/ui/settings/test_delete_account_desktop.py::test_delete_account_from_settings_desktop -v
 ```
 
 Mail (нужны `MAIL_*` в `.env`, `RUN_MAIL_INTEGRATION=1`):
