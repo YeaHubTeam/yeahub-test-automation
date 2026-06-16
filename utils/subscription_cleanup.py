@@ -6,6 +6,8 @@ from constants.constants import NAME_SUBSCRIPTIONS
 from models.Subscriptions.model_user_subsriptions import UserSubscriptionResponse
 from utils.helpers import DataUtils
 
+_BLOCKING_SUBSCRIPTION_STATES = frozenset({"pending_payment", "active"})
+
 
 def premium_tariff_id(subscriptions_catalog) -> int:
     return DataUtils.find_item(
@@ -37,22 +39,21 @@ def delete_user_premium_subscription_if_present(
         return
 
     validated = DataUtils.type_adapter(list[UserSubscriptionResponse], last_existing.json())
-    row = DataUtils.find_item(
-        items=validated,
-        condition=lambda sub: (
-            sub.subscription_id == tariff_id
-            and sub.state in ["pending_payment", "active", "canceled", "inactive"]
-        ),
-    )
-    if not row:
+    blocking_rows = [
+        sub
+        for sub in validated
+        if sub.subscription_id == tariff_id and sub.state in _BLOCKING_SUBSCRIPTION_STATES
+    ]
+    if not blocking_rows:
         return
 
-    cleanup_body = {
-        "subscriptionId": tariff_id,
-        "userId": user_id,
-        "orderId": row.id,
-    }
-    api_manager.subscriptions_api.delete_subscriptions(
-        cleanup_body,
-        expected_status=expected_delete_status or [200, 404],
-    )
+    for row in blocking_rows:
+        cleanup_body = {
+            "subscriptionId": tariff_id,
+            "userId": user_id,
+            "orderId": row.id,
+        }
+        api_manager.subscriptions_api.delete_subscriptions(
+            cleanup_body,
+            expected_status=expected_delete_status or [200, 404],
+        )

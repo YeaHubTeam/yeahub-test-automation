@@ -16,10 +16,13 @@ uv run ruff format . --check
 uv run pytest -m "unit or pr_safe"
 ```
 
-UI auth smoke (Integration `scope=ui-auth` или локально):
+UI auth smoke (Integration `scope=ui-auth` или локально; **`MAIL_*` не нужны**):
 
 ```bash
+export APP_BASE_URL="${APP_BASE_URL:-https://app.yeatwork.ru}"
 uv run pytest tests/ui/auth/test_login_email_desktop.py::test_login_with_email_and_password_desktop \
+  tests/ui/auth/test_register_form_desktop.py::test_register_form_desktop \
+  tests/ui/interview/test_onboarding_flow_e2e.py::test_onboarding_after_register_desktop \
   tests/ui/auth/test_register_verify_email_e2e.py::test_register_page_opens \
   tests/ui/settings/test_change_password_desktop.py::test_change_password_settings_desktop \
   tests/ui/settings/test_delete_account_desktop.py::test_delete_account_from_settings_desktop -v

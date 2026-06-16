@@ -6,7 +6,7 @@
 
 Teardown: удаление пользователя через API.
 
-Email: `MAIL_EMAIL` + tag (как register/mail e2e), не faker — письма Verify попадают в тестовый ящик.
+Email: `DataGenerator.random_email()` — UI smoke без IMAP (`MAIL_*` не нужны; scope ui-auth).
 """
 
 import re
@@ -20,7 +20,7 @@ from api.api_manager import ApiManager
 from pages.auth.register_page import RegisterPage
 from pages.interview.interview_page import InterviewPage
 from tests.mail.verification_flow import delete_authenticated_user_via_api
-from tests.ui.flows.register_mail_interview_flow import new_plus_tagged_email
+from utils.data_generator import DataGenerator
 from utils.reporting import report_step
 
 
@@ -39,11 +39,13 @@ from utils.reporting import report_step
 @testit.description(
     "Ручной ТК: шаги 1–9. UI /auth/register → согласия → /interview, модалка Onboarding. "
     "Письмо Verify — test_register_and_verify_email_e2e. "
-    "Постусловие: delete_authenticated_user_via_api. Email: MAIL_EMAIL + tag."
+    "Постусловие: delete_authenticated_user_via_api. Email: random (без MAIL_*)."
 )
 def test_register_form_desktop(page: Page, api_manager: ApiManager):
     """Регистрация: форма, согласия, переход на interview (desktop)."""
-    _started_at, _tag, email, password, username = new_plus_tagged_email()
+    username = DataGenerator.random_username()
+    email = DataGenerator.random_email()
+    password = DataGenerator.random_password()
 
     register_page = RegisterPage(page)
     interview_page = InterviewPage(page)

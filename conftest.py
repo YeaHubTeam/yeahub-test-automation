@@ -159,7 +159,7 @@ def unverified_mail_registered_user(api_manager, test_user):
 
     test_user["id"] = last_response.json().get("user", {}).get("id")
     test_user["token"] = last_response.json().get("access_token")
-    test_user["mail_since"] = datetime.now(timezone.utc)
+    test_user["mail_since"] = _started_at
     assert_profile_not_verified(api_manager, test_user["email"], test_user["password"])
     yield test_user
     _delete_user_try_passwords(

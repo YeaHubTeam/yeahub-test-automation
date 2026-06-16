@@ -94,7 +94,7 @@ jobs:
           set -euo pipefail
 
           run_ui_auth_smoke() {
-            echo "UI auth smoke: login 409 + register form + onboarding 459 + change password 113 + delete account 117"
+            echo "UI auth smoke: login 409 + register form (no MAIL_*) + onboarding 459 + change password 113 + delete account 117"
             export APP_BASE_URL="${APP_BASE_URL:-https://app.yeatwork.ru}"
             export CI=true
             uv run pytest -q \
