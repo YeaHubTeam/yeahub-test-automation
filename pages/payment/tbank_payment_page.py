@@ -1,4 +1,13 @@
+import re
+
 from playwright.sync_api import expect
+
+_PAY_TBANK_URL = re.compile(r"pay\.tbank\.ru", re.I)
+_RETURN_TO_SHOP_RE = re.compile(
+    r"^В\s+магазин$|^Return\s+to\s+(the\s+)?store$|вернуться\s+в\s+магазин",
+    re.I,
+)
+_POST_RETURN_ORIGIN_RE = re.compile(r"yeahub\.ru|yeatwork\.ru", re.I)
 
 
 class TBankPaymentPage:
@@ -57,3 +66,19 @@ class TBankPaymentPage:
         expect(self.page.get_by_text("Не получилось оплатить")).to_be_visible(
             timeout=self.PAYMENT_STATUS_TIMEOUT
         )
+
+    def click_return_to_shop(self) -> None:
+        """Шаг 6 ТК 116: «В магазин» на экране «Оплачено» (T-Bank sandbox)."""
+        status_page = self.page.locator("[automation-id='status-page']")
+        expect(status_page).to_be_visible(timeout=self.PAYMENT_STATUS_TIMEOUT)
+        return_btn = (
+            status_page.get_by_role("button", name=_RETURN_TO_SHOP_RE)
+            .or_(status_page.get_by_role("link", name=_RETURN_TO_SHOP_RE))
+            .or_(status_page.get_by_text(_RETURN_TO_SHOP_RE))
+        )
+        expect(return_btn.first).to_be_visible(timeout=self.PAYMENT_STATUS_TIMEOUT)
+        return_btn.first.click()
+
+    def expect_left_tbank_after_return(self) -> None:
+        expect(self.page).not_to_have_url(_PAY_TBANK_URL, timeout=30_000)
+        expect(self.page).to_have_url(_POST_RETURN_ORIGIN_RE, timeout=30_000)

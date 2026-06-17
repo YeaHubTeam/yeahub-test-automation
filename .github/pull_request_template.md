@@ -16,28 +16,45 @@ uv run ruff format . --check
 uv run pytest -m "unit or pr_safe"
 ```
 
-UI auth smoke (Integration `scope=ui-auth` или локально):
+UI auth smoke (Integration `scope=ui-auth` или локально; **`MAIL_*` не нужны**):
 
 ```bash
+export APP_BASE_URL="${APP_BASE_URL:-https://app.yeatwork.ru}"
 uv run pytest tests/ui/auth/test_login_email_desktop.py::test_login_with_email_and_password_desktop \
+  tests/ui/auth/test_register_form_desktop.py::test_register_form_desktop \
+  tests/ui/interview/test_onboarding_flow_e2e.py::test_onboarding_after_register_desktop \
   tests/ui/auth/test_register_verify_email_e2e.py::test_register_page_opens \
-  tests/ui/settings/test_change_password_desktop.py::test_change_password_settings_desktop -v
+  tests/ui/settings/test_change_password_desktop.py::test_change_password_settings_desktop \
+  tests/ui/settings/test_delete_account_desktop.py::test_delete_account_from_settings_desktop -v
 ```
 
-Mail + forgot password ТК 115 (нужны `MAIL_*` в `.env`, `RUN_MAIL_INTEGRATION=1`):
+Mail (нужны `MAIL_*` в `.env`, `RUN_MAIL_INTEGRATION=1`):
 
 ```bash
+# ТК 422 — email verify в settings (~1.5–2 min)
+RUN_MAIL_INTEGRATION=1 uv run pytest \
+  tests/ui/auth/test_email_verify_desktop.py::test_email_verify_registered_user_desktop -v
+
+# ТК 115 — forgot password
 RUN_MAIL_INTEGRATION=1 uv run pytest \
   tests/ui/auth/test_forgot_password_recovery_desktop.py::test_forgot_password_recovery_desktop -v
 ```
 
-Полный mail-контур (как `scope=mail` / nightly **mail-e2e**): см. [README — CI Strategy](README.md#ci-strategy).
+Полный mail-контур (как `scope=mail` / nightly **mail-e2e**): см. [README — Проверки перед PR](README.md#проверки-перед-pr) и [CI Strategy](README.md#ci-strategy).
 
-UI payment (нужны `VERIFIED_USER_*`):
+UI payment — API link (`VERIFIED_USER_*` в `.env` или secrets):
 
 ```bash
 uv run pytest tests/ui/subscription/test_subscription_payment_ui.py -v
 ```
+
+UI payment — ТК 116, полный checkout (`MAIL_*` в `.env`, `RUN_MAIL_INTEGRATION=1`):
+
+```bash
+RUN_MAIL_INTEGRATION=1 uv run pytest tests/ui/subscription/test_subscription_tariff_card_desktop.py -v
+```
+
+Integration `scope=ui-payment`: нужны оба набора — `VERIFIED_USER_*` и `MAIL_*`.
 
 ## Чеклист
 - [ ] Линтер пройден (`ruff check .` и `ruff format --check .`)

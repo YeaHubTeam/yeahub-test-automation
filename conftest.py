@@ -1,4 +1,5 @@
 import time
+from datetime import datetime, timezone
 
 import pytest
 import requests
@@ -9,9 +10,9 @@ from urllib3.util.retry import Retry
 from api.api_manager import ApiManager
 from models.auth_model import AuthModel
 from models.Subscriptions.model_subscription import ModelSubscriptionResponse
-from models.Subscriptions.model_user_subsriptions import UserSubscriptionResponse
 from resources.user_creds import VerifiedUserCreds
 from tests.mail.verification_flow import (
+    assert_profile_not_verified,
     authenticate_for_teardown,
     profile_user_id,
     verify_api_registered_user_email,
@@ -19,6 +20,7 @@ from tests.mail.verification_flow import (
 from tests.ui.flows.register_mail_interview_flow import new_plus_tagged_email, require_mail_creds
 from utils.data_generator import DataGenerator
 from utils.helpers import DataUtils
+from utils.subscription_cleanup import delete_user_premium_subscription_if_present
 
 load_dotenv()
 
@@ -121,6 +123,44 @@ def registered_user(api_manager, test_user):
 
     test_user["id"] = last_response.json().get("user", {}).get("id")
     test_user["token"] = last_response.json().get("access_token")
+    yield test_user
+    _delete_user_try_passwords(
+        api_manager,
+        email=test_user["email"],
+        user_id=test_user.get("id"),
+        password=test_user["password"],
+        active_password=test_user.get("active_password"),
+    )
+
+
+@pytest.fixture
+def unverified_mail_registered_user(api_manager, test_user):
+    """API signUp на MAIL_EMAIL+tag, isVerified=false. Для UI ТК 422 (IMAP verify)."""
+    require_mail_creds()
+    _started_at, _tag, recipient_email, password, username = new_plus_tagged_email()
+    test_user["email"] = recipient_email
+    test_user["password"] = password
+    test_user["username"] = username
+    last_response = None
+    for attempt in range(5):
+        last_response = api_manager.auth_api.register_user(
+            test_user, expected_status=[201, 503, 409]
+        )
+        if last_response.status_code == 201:
+            break
+        _started_at, _tag, recipient_email, password, username = new_plus_tagged_email()
+        test_user["email"] = recipient_email
+        test_user["password"] = password
+        test_user["username"] = username
+        time.sleep(2 * (attempt + 1))
+
+    assert last_response is not None
+    assert last_response.status_code == 201, "signUp is unavailable (503) after retries"
+
+    test_user["id"] = last_response.json().get("user", {}).get("id")
+    test_user["token"] = last_response.json().get("access_token")
+    test_user["mail_since"] = _started_at
+    assert_profile_not_verified(api_manager, test_user["email"], test_user["password"])
     yield test_user
     _delete_user_try_passwords(
         api_manager,
@@ -243,43 +283,14 @@ def get_list_subscriptions(api_manager):
 @pytest.fixture(scope="function")
 def payment_link_subscriptions(api_manager, static_user, get_list_subscriptions):
     """Создает ссылку на оплату подписки."""
+    delete_user_premium_subscription_if_present(
+        api_manager, user_id=static_user.id, subscriptions_catalog=get_list_subscriptions
+    )
     id_subscriptions = DataUtils.find_item(
         items=get_list_subscriptions,
         condition=lambda sub: sub.name == "Премиум на 3 месяца",
         transform=lambda sub: sub.id,
     )
-    # subscriptions/users иногда отвечает 503 от nginx; для устойчивости делаем короткие ретраи
-    last_existing = None
-    for attempt in range(5):
-        last_existing = api_manager.subscriptions_api.get_subscriptions_users(
-            static_user.id, expected_status=[200, 503]
-        )
-        if last_existing.status_code == 200:
-            break
-        time.sleep(2 * (attempt + 1))
-
-    assert last_existing is not None
-    assert last_existing.status_code == 200, (
-        "subscriptions/users is unavailable (503) after retries"
-    )
-
-    existing_subscriptions = last_existing.json()
-    validated_subscriptions = DataUtils.type_adapter(
-        list[UserSubscriptionResponse], existing_subscriptions
-    )
-    pending_subscription = DataUtils.find_item(
-        items=validated_subscriptions,
-        condition=lambda sub: (
-            sub.subscription_id == id_subscriptions and sub.state in ["pending_payment", "active"]
-        ),
-    )
-    if pending_subscription:
-        cleanup_body = {
-            "subscriptionId": id_subscriptions,
-            "userId": static_user.id,
-            "orderId": pending_subscription.id,
-        }
-        api_manager.subscriptions_api.delete_subscriptions(cleanup_body, expected_status=[200, 404])
 
     # payment/init иногда отвечает 503 от nginx; для устойчивости делаем короткие ретраи
     last_response = None
@@ -298,22 +309,6 @@ def payment_link_subscriptions(api_manager, static_user, get_list_subscriptions)
 
     payment_url = last_response.text
     yield payment_url
-    teardown_subscriptions = api_manager.subscriptions_api.get_subscriptions_users(
-        static_user.id
-    ).json()
-    teardown_validated = DataUtils.type_adapter(
-        list[UserSubscriptionResponse], teardown_subscriptions
+    delete_user_premium_subscription_if_present(
+        api_manager, user_id=static_user.id, subscriptions_catalog=get_list_subscriptions
     )
-    teardown_row = DataUtils.find_item(
-        items=teardown_validated,
-        condition=lambda sub: (
-            sub.subscription_id == id_subscriptions and sub.state in ["pending_payment", "active"]
-        ),
-    )
-    if teardown_row:
-        request_body = {
-            "subscriptionId": id_subscriptions,
-            "userId": static_user.id,
-            "orderId": teardown_row.id,
-        }
-        api_manager.subscriptions_api.delete_subscriptions(request_body)

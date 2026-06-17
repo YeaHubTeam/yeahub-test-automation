@@ -130,18 +130,18 @@ uv run pytest --collect-only
 - запускается вручную через `Actions -> Integration (Live) -> Run workflow`
 - запускается автоматически ночью по `schedule` (основной job + отдельный **mail-e2e**)
 - `scope=smoke` запускает `pytest -m "smoke and integration and not ui"` (без Playwright UI)
-- `scope=full` и ночной прогон (`schedule`) основного job: `pytest -m "integration and not ui"`, затем UI auth smoke (login ТК 409, register page, смена пароля ТК 113) и UI payment (если заданы `VERIFIED_USER_*`)
-- `scope=ui-auth`: Playwright auth/settings smoke — `test_login_email_desktop` (ТК 409), `test_register_page_opens`, `test_change_password_settings_desktop` (ТК 113; `registered_user`, без IMAP) (`--testit`, `APP_BASE_URL` по умолчанию `https://app.yeatwork.ru`)
-- `scope=ui-payment`: Playwright `tests/ui/subscription/test_subscription_payment_ui.py` (нужны secrets `VERIFIED_USER_EMAIL`, `VERIFIED_USER_PASSWORD`)
-- `scope=mail`: API `test_email_verification_e2e` + Playwright register/verify + **forgot password recovery (ТК 115)** + онбординг `test_onboarding_full_flow_e2e` с `RUN_MAIL_INTEGRATION=1`, `--testit`, `APP_BASE_URL` по умолчанию `https://app.yeatwork.ru` (тайминги same-email для регистрационного e2e — дефолты в коде, как при локальном запуске)
-- ночной job **mail-e2e** (только `schedule`): те же **четыре** теста, что и при `scope=mail` (API verify-email, register→IMAP, forgot password ТК 115, onboarding), плюс `MAIL_*` secrets и установка Chromium для Playwright
+- `scope=full` и ночной прогон (`schedule`) основного job: `pytest -m "integration and not ui"`, затем UI auth smoke (как `scope=ui-auth`: login ТК 409, register form, onboarding ТК 459, register page opens, change password ТК 113, delete account ТК 117) и UI payment (если заданы `VERIFIED_USER_*`)
+- `scope=ui-auth`: Playwright auth/interview smoke — login (ТК 409), `test_register_form_desktop` (faker email, **без** `MAIL_*`), `test_onboarding_after_register_desktop` (ТК 459), `test_register_page_opens`, change password (ТК 113), delete account (ТК 117; `registered_user`, без IMAP) (`--testit`, `APP_BASE_URL` по умолчанию `https://app.yeatwork.ru`)
+- `scope=ui-payment`: `test_subscription_payment_ui.py` (`VERIFIED_USER_*`) + `test_subscription_tariff_card_desktop.py` (ТК 116; `RUN_MAIL_INTEGRATION=1`, `MAIL_*`)
+- `scope=mail`: API verify-email (ТК 466) + UI email verify (ТК 422) + Playwright register→IMAP (52) + **forgot password (ТК 115)** с `RUN_MAIL_INTEGRATION=1`, `--testit`, `APP_BASE_URL` по умолчанию `https://app.yeatwork.ru` (тайминги same-email для регистрационного e2e — дефолты в коде, как при локальном запуске). Онбординг ТК 459 — в `scope=ui-auth`.
+- ночной job **mail-e2e** (только `schedule`): те же mail-тесты, что и при `scope=mail` (API verify-email 466, UI email verify 422, register→IMAP, forgot password 115), плюс `MAIL_*` secrets и Chromium для Playwright
 - перед тестами выполняется preflight API healthcheck (`/subscriptions` + доступность `/auth/refresh`)
 - после каждого manual/nightly run сохраняются artifacts `allure-results-<run_number>` и `allure-report-<run_number>`
 
 Для `Integration CI` в GitHub Actions должны быть заведены repository secrets:
-- `VERIFIED_USER_EMAIL`
-- `VERIFIED_USER_PASSWORD`
-- для mail / nightly mail-e2e: `MAIL_HOST`, `MAIL_PORT`, `MAIL_EMAIL`, `MAIL_PASSWORD`, `MAIL_FOLDER` (и при использовании Test IT — `TMS_*`, см. workflow)
+- `VERIFIED_USER_EMAIL`, `VERIFIED_USER_PASSWORD` — UI payment по API-ссылке (`test_subscription_payment_ui.py`)
+- `MAIL_HOST`, `MAIL_PORT`, `MAIL_EMAIL`, `MAIL_PASSWORD`, `MAIL_FOLDER` — mail e2e, nightly **mail-e2e** и ТК 116 (`test_subscription_tariff_card_desktop.py`); для `scope=ui-payment` нужны **оба** набора (`VERIFIED_USER_*` + `MAIL_*`)
+- при использовании Test IT — `TMS_*` (см. workflow)
 
 Artifacts доступны на странице конкретного workflow run в GitHub Actions.
 
@@ -248,7 +248,7 @@ Test IT: `--testit`, `externalId`: `yeahub-api-auth-email-verification-e2e-466`.
 
 ### UI E2E (Playwright): вход по email и паролю (desktop, ТК 409)
 
-Автотест `tests/ui/auth/test_login_email_desktop.py` — ручной кейс [409](https://team-vz1y.testit.software/browse/409), **шаги 1–4**: форма `/auth/login`, ввод email/пароля, «Вход», переход на `/interview`. Пользователь создаётся через API (`registered_user`), в teardown удаляется (`delete_user`). Постусловие «Выйти» через UI в этом тесте **не** автоматизировано (см. onboarding e2e / `tests/auth/test_auth_logout.py`).
+Автотест `tests/ui/auth/test_login_email_desktop.py` — ручной кейс [409](https://team-vz1y.testit.software/browse/409), **шаги 1–4**: форма `/auth/login`, ввод email/пароля, «Вход», переход на `/interview`. Пользователь создаётся через API (`registered_user`), в teardown удаляется (`delete_user`). Постусловие «Выйти» через UI в этом тесте **не** автоматизировано (см. `tests/auth/test_auth_logout.py`).
 
 Локальный запуск:
 
@@ -260,11 +260,42 @@ uv run pytest tests/ui/auth/test_login_email_desktop.py::test_login_with_email_a
 
 CI (Integration workflow, scope `ui-auth` или ночной `schedule` / `scope=full` после API): см. [CI Strategy](#ci-strategy).
 
-В том же scope `ui-auth` дополнительно гоняется лёгкий smoke «открылась страница регистрации»:
+### UI E2E (Playwright): регистрация — форма и submit (desktop, ТК 477)
+
+Автотест `tests/ui/auth/test_register_form_desktop.py` — ручной кейс [477](https://team-vz1y.testit.software/browse/477), **шаги 1–9**: `/auth/register`, заполнение полей, согласия, «Зарегистрироваться» → `/interview`, модалка Onboarding **без** прохождения онбординга. Email: `DataGenerator.random_email()` (UI smoke, **`MAIL_*` не нужны**). Письмо Verify Your Email — ТК 422 (`test_email_verify_desktop`, scope `mail`) или полный e2e 52. Teardown: удаление пользователя через API.
+
+```bash
+uv run pytest tests/ui/auth/test_register_form_desktop.py::test_register_form_desktop -v
+```
+
+С браузером: `--headed`. Test IT: `--testit`, `externalId`: `yeahub-ui-auth-register-form-desktop`. CI: `scope=ui-auth`.
+
+В том же scope `ui-auth` — лёгкий smoke «открылась страница регистрации»:
 
 ```bash
 uv run pytest tests/ui/auth/test_register_verify_email_e2e.py::test_register_page_opens -v
 ```
+
+### UI E2E (Playwright): онбординг после регистрации (desktop, ТК 459)
+
+Автотест `tests/ui/interview/test_onboarding_flow_e2e.py::test_onboarding_after_register_desktop` — [459](https://team-vz1y.testit.software/browse/459): предусловия API `registered_user` + UI login → `/interview`; шаги 1–7 онбординга до закрытия модалки. Специализация в автотесте: React Frontend Developer (id=11). Verify email и полный mail-register e2e — отдельно (scope `mail`).
+
+```bash
+uv run pytest tests/ui/interview/test_onboarding_flow_e2e.py::test_onboarding_after_register_desktop -v
+```
+
+С браузером: `--headed`. Test IT: `--testit`, `externalId`: `yeahub-ui-interview-onboarding-after-register-desktop-459`. CI: `scope=ui-auth` (не `scope=mail`).
+
+### UI E2E (Playwright): подтверждение email в настройках (desktop, ТК 422)
+
+Автотест `tests/ui/auth/test_email_verify_desktop.py` — [422](https://team-vz1y.testit.software/browse/422): API signUp (неподтверждённый, `MAIL_EMAIL` + tag) → UI login → `/interview` → онбординг 1/5–5/5 (техн., если мешает) → верификация: CTA «Подтвердить e-mail» в шапке **или** прямой `/settings#email-verify` (на stage CTA после API signUp часто нет) → reload → «Подтвердить» (при rate limit после signUp — пауза/повтор; письмо ищем в IMAP с `mail_since` из фикстуры `unverified_mail_registered_user` — метка с момента `new_plus_tagged_email()`, не `now()`; при необходимости API resend) → ссылка из IMAP в новой вкладке → «Почта успешно подтверждена». Teardown — удаление пользователя через API.
+
+```bash
+RUN_MAIL_INTEGRATION=1 uv run pytest \
+  tests/ui/auth/test_email_verify_desktop.py::test_email_verify_registered_user_desktop -v
+```
+
+С браузером: `--headed`. Test IT: `--testit`, `externalId`: `yeahub-ui-auth-email-verify-desktop-422` (длинный прогон ~1.5–2 мин — локальный Sync Storage при `--testit` может оборваться раньше теста; pytest при этом зелёный). CI: `scope=mail` или nightly **mail-e2e**.
 
 ### UI E2E (Playwright): восстановление пароля через письмо (desktop, ТК 115)
 
@@ -287,15 +318,30 @@ uv run pytest tests/ui/settings/test_change_password_desktop.py::test_change_pas
 
 С браузером: `--headed`. Test IT: `--testit`, `externalId`: `yeahub-ui-settings-change-password-desktop-113`. CI: тот же `scope=ui-auth`, что login 409.
 
+### UI E2E (Playwright): удаление аккаунта в настройках (desktop, ТК 117)
+
+Автотест `tests/ui/settings/test_delete_account_desktop.py` — [117](https://team-vz1y.testit.software/browse/117): `/settings#account` → модалка удаления → `/auth/register` → login с учётными данными удалённого пользователя (HTTP 401). Пользователь: API `registered_user`, удаление через UI, teardown — no-op при `auth_failed`.
+
+```bash
+uv run pytest tests/ui/settings/test_delete_account_desktop.py::test_delete_account_from_settings_desktop -v
+```
+
+С браузером: `--headed`. Test IT: `--testit`, `externalId`: `yeahub-ui-settings-delete-account-desktop-117`. CI: `scope=ui-auth` (~20 s).
+
 ### UI E2E (Playwright): оплата подписки (T-Bank)
 
 `tests/ui/subscription/test_subscription_payment_ui.py` — UI оплаты по ссылке из API (`static_user` / `VERIFIED_USER_*` в secrets).
 
+`tests/ui/subscription/test_subscription_tariff_card_desktop.py` — ТК 116: signUp + IMAP verify → тариф в settings → модалка → T-Bank → активная подписка (`verified_registered_user`, teardown delete user).
+
 ```bash
 uv run pytest tests/ui/subscription/test_subscription_payment_ui.py -v
+RUN_MAIL_INTEGRATION=1 uv run pytest tests/ui/subscription/test_subscription_tariff_card_desktop.py -v --headed
 ```
 
-CI: Integration workflow, scope `ui-payment` (или ночной `schedule` / `scope=full` после auth smoke, если заданы `VERIFIED_USER_*`).
+Test IT: `--testit`, `externalId`: `yeahub-ui-subscription-tariff-card-desktop-116`. Для 116 нужны `MAIL_*` в `.env` (как mail e2e).
+
+CI: Integration workflow, scope `ui-payment` — API-link smoke: `VERIFIED_USER_*`; ТК 116: `MAIL_*` + `RUN_MAIL_INTEGRATION=1`.
 
 ### UI E2E (Playwright): регистрация в браузере → IMAP → онбординг → удаление → опционально тот же email
 
@@ -413,7 +459,35 @@ uv run pre-commit run --all-files
 - `uv run ruff format . --check`
 - `uv run pytest -m "unit or pr_safe"`
 - для расширения `pr_safe` прогнать `unit or pr_safe` несколько раз подряд и зафиксировать baseline
-- при изменениях в UI auth/mail: `scope=ui-auth` в Integration CI или локально login 409 + change password 113; для ТК 115 — `RUN_MAIL_INTEGRATION=1` и `tests/ui/auth/test_forgot_password_recovery_desktop.py`
+- при изменениях в UI auth/interview/onboarding: Integration `scope=ui-auth` или локально (как `run_ui_auth_smoke` в `integration.yml`; **`MAIL_*` не нужны**):
+
+  ```bash
+  export APP_BASE_URL="${APP_BASE_URL:-https://app.yeatwork.ru}"
+  uv run pytest -q \
+    tests/ui/auth/test_login_email_desktop.py::test_login_with_email_and_password_desktop \
+    tests/ui/auth/test_register_form_desktop.py::test_register_form_desktop \
+    tests/ui/interview/test_onboarding_flow_e2e.py::test_onboarding_after_register_desktop \
+    tests/ui/auth/test_register_verify_email_e2e.py::test_register_page_opens \
+    tests/ui/settings/test_change_password_desktop.py::test_change_password_settings_desktop \
+    tests/ui/settings/test_delete_account_desktop.py::test_delete_account_from_settings_desktop
+  ```
+
+- для ТК 117 (удаление аккаунта в settings): `tests/ui/settings/test_delete_account_desktop.py::test_delete_account_from_settings_desktop` (~20 s)
+- при изменениях в `pages/interview/onboarding_modal.py` (специализация, закрытие модалки) дополнительно: `test_register_and_verify_email_e2e` с `RUN_MAIL_INTEGRATION=1`
+- для ТК 422 (email verify в settings): `RUN_MAIL_INTEGRATION=1` и `tests/ui/auth/test_email_verify_desktop.py::test_email_verify_registered_user_desktop` (или полный mail-контур ниже)
+- для ТК 115 (forgot password): `RUN_MAIL_INTEGRATION=1` и `tests/ui/auth/test_forgot_password_recovery_desktop.py`
+- для ТК 116 (оплата подписки через UI, tariff card): `RUN_MAIL_INTEGRATION=1`, `MAIL_*` в `.env` и `tests/ui/subscription/test_subscription_tariff_card_desktop.py` (~1–2 min)
+- полный mail-контур (как `scope=mail` / nightly **mail-e2e** в Integration CI):
+
+  ```bash
+  export RUN_MAIL_INTEGRATION=1
+  export APP_BASE_URL="${APP_BASE_URL:-https://app.yeatwork.ru}"
+  uv run pytest -q \
+    tests/auth/test_auth_verify_email_e2e.py::test_email_verification_e2e \
+    tests/ui/auth/test_email_verify_desktop.py::test_email_verify_registered_user_desktop \
+    tests/ui/auth/test_register_verify_email_e2e.py::test_register_and_verify_email_e2e \
+    tests/ui/auth/test_forgot_password_recovery_desktop.py::test_forgot_password_recovery_desktop
+  ```
 - при изменениях в live-контуре дополнительно прогнать `smoke and integration` вручную
 - ветка обновлена через `merge origin/master`
 - новые зависимости добавлены в `pyproject.toml` и `uv.lock`

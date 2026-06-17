@@ -51,7 +51,7 @@ def register_ui_through_interview_first_continue(
     """Регистрация на /auth/register и первый шаг онбординга (Continue).
 
     Порядок как в `test_register_and_verify_email_e2e`: после Continue сразу можно звать verify (без ожидания UI 2/5).
-    `expect_tc_step1_progress=True` — доп. проверка «1/5» для e2e онбординга (см. test_onboarding_full_flow_e2e).
+    `expect_tc_step1_progress=True` — доп. проверка «1/5» перед IMAP (см. register/verify e2e).
     """
     register_page = RegisterPage(page)
     register_page.open()
