@@ -69,7 +69,7 @@ jobs:
           set -euo pipefail
           SUBSCRIPTIONS_URL="https://api.yeatwork.ru/subscriptions"
           AUTH_URL="https://api.yeatwork.ru/auth/refresh"
-          for attempt in 1 2 3 4 5; do
+          for attempt in 1 2 3 4 5 6 7 8; do
             subscriptions_status="$(curl --connect-timeout 5 --max-time 15 -sS -o /dev/null -w "%{http_code}" "$SUBSCRIPTIONS_URL" || true)"
             auth_status="$(curl --connect-timeout 5 --max-time 15 -sS -o /dev/null -w "%{http_code}" "$AUTH_URL" || true)"
 
@@ -77,13 +77,13 @@ jobs:
               echo "API preflight is healthy on attempt $attempt (subscriptions=$subscriptions_status, auth=$auth_status)"
               exit 0
             fi
-            echo "API preflight not ready (subscriptions=$subscriptions_status, auth=$auth_status), attempt $attempt/5"
-            if [ "$attempt" = "5" ]; then
+            echo "API preflight not ready (subscriptions=$subscriptions_status, auth=$auth_status), attempt $attempt/8"
+            if [ "$attempt" = "8" ]; then
               break
             fi
-            sleep 10
+            sleep 15
           done
-          echo "API preflight failed. Expected subscriptions=200 and auth=200/401/403 after 5 attempts."
+          echo "API preflight failed. Expected subscriptions=200 and auth=200/401/403 after 8 attempts."
           exit 1
 
       - name: Run integration tests with Allure
@@ -273,7 +273,7 @@ jobs:
           set -euo pipefail
           SUBSCRIPTIONS_URL="https://api.yeatwork.ru/subscriptions"
           AUTH_URL="https://api.yeatwork.ru/auth/refresh"
-          for attempt in 1 2 3 4 5; do
+          for attempt in 1 2 3 4 5 6 7 8; do
             subscriptions_status="$(curl --connect-timeout 5 --max-time 15 -sS -o /dev/null -w "%{http_code}" "$SUBSCRIPTIONS_URL" || true)"
             auth_status="$(curl --connect-timeout 5 --max-time 15 -sS -o /dev/null -w "%{http_code}" "$AUTH_URL" || true)"
 
@@ -281,13 +281,13 @@ jobs:
               echo "API preflight is healthy on attempt $attempt (subscriptions=$subscriptions_status, auth=$auth_status)"
               exit 0
             fi
-            echo "API preflight not ready (subscriptions=$subscriptions_status, auth=$auth_status), attempt $attempt/5"
-            if [ "$attempt" = "5" ]; then
+            echo "API preflight not ready (subscriptions=$subscriptions_status, auth=$auth_status), attempt $attempt/8"
+            if [ "$attempt" = "8" ]; then
               break
             fi
-            sleep 10
+            sleep 15
           done
-          echo "API preflight failed. Expected subscriptions=200 and auth=200/401/403 after 5 attempts."
+          echo "API preflight failed. Expected subscriptions=200 and auth=200/401/403 after 8 attempts."
           exit 1
 
       - name: Run mail e2e with Allure

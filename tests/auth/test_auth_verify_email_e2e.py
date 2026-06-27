@@ -19,6 +19,7 @@ import testit
 from api.api_manager import ApiManager
 from mail.mail_client import MailClient
 from resources.mail_creds import MailCreds
+from tests.mail.signup_retry import register_user_with_retries
 from tests.mail.verification_flow import delete_authenticated_user_via_api
 from utils.data_generator import DataGenerator
 
@@ -73,18 +74,14 @@ def test_email_verification_e2e(api_manager: ApiManager):
 
         with allure.step("Регистрируем пользователя (с ретраями на 503)"):
             started_at = datetime.now(timezone.utc)
-            last_signup = None
-            for attempt in range(5):
-                last_signup = api_manager.auth_api.register_user(
-                    user_payload, expected_status=[201, 503, 409]
-                )
-                if last_signup.status_code == 201:
-                    break
-                if last_signup.status_code == 409:
-                    user_payload["phone"] = DataGenerator.random_phone()
-                time.sleep(2 * (attempt + 1))
 
-            assert last_signup is not None
+            def _on_signup_retry(_attempt: int, response) -> None:
+                if response.status_code == 409:
+                    user_payload["phone"] = DataGenerator.random_phone()
+
+            last_signup = register_user_with_retries(
+                api_manager, user_payload, on_retry=_on_signup_retry
+            )
             if last_signup.status_code == 409:
                 pytest.fail("Registration conflict after retries. Try a new tag/phone.")
             assert last_signup.status_code == 201, "signUp is unavailable (503) after retries"

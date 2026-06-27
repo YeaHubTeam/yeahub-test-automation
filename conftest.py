@@ -11,6 +11,7 @@ from api.api_manager import ApiManager
 from models.auth_model import AuthModel
 from models.Subscriptions.model_subscription import ModelSubscriptionResponse
 from resources.user_creds import VerifiedUserCreds
+from tests.mail.signup_retry import login_user_with_retries, register_user_with_retries
 from tests.mail.verification_flow import (
     assert_profile_not_verified,
     authenticate_for_teardown,
@@ -105,20 +106,12 @@ def test_user():
 @pytest.fixture
 def registered_user(api_manager, test_user):
     """Регистрация пользователя и удаление его после теста"""
-    # signUp иногда отвечает 503 от nginx; для устойчивости делаем короткие ретраи.
-    # Важно: на каждом ретрае меняем email/username, чтобы не упираться в 409 duplicate.
-    last_response = None
-    for attempt in range(5):
-        last_response = api_manager.auth_api.register_user(
-            test_user, expected_status=[201, 503, 409]
-        )
-        if last_response.status_code == 201:
-            break
+
+    def _refresh_identity(_attempt: int, _response) -> None:
         test_user["email"] = DataGenerator.random_email()
         test_user["username"] = DataGenerator.random_username()
-        time.sleep(2 * (attempt + 1))
 
-    assert last_response is not None
+    last_response = register_user_with_retries(api_manager, test_user, on_retry=_refresh_identity)
     assert last_response.status_code == 201, "signUp is unavailable (503) after retries"
 
     test_user["id"] = last_response.json().get("user", {}).get("id")
@@ -137,29 +130,28 @@ def registered_user(api_manager, test_user):
 def unverified_mail_registered_user(api_manager, test_user):
     """API signUp на MAIL_EMAIL+tag, isVerified=false. Для UI ТК 422 (IMAP verify)."""
     require_mail_creds()
-    _started_at, _tag, recipient_email, password, username = new_plus_tagged_email()
+    mail_identity = {"started_at": None}
+    started_at, _tag, recipient_email, password, username = new_plus_tagged_email()
+    mail_identity["started_at"] = started_at
     test_user["email"] = recipient_email
     test_user["password"] = password
     test_user["username"] = username
-    last_response = None
-    for attempt in range(5):
-        last_response = api_manager.auth_api.register_user(
-            test_user, expected_status=[201, 503, 409]
-        )
-        if last_response.status_code == 201:
-            break
-        _started_at, _tag, recipient_email, password, username = new_plus_tagged_email()
-        test_user["email"] = recipient_email
-        test_user["password"] = password
-        test_user["username"] = username
-        time.sleep(2 * (attempt + 1))
 
-    assert last_response is not None
+    def _refresh_mail_identity(_attempt: int, _response) -> None:
+        new_started_at, _new_tag, new_email, new_password, new_username = new_plus_tagged_email()
+        mail_identity["started_at"] = new_started_at
+        test_user["email"] = new_email
+        test_user["password"] = new_password
+        test_user["username"] = new_username
+
+    last_response = register_user_with_retries(
+        api_manager, test_user, on_retry=_refresh_mail_identity
+    )
     assert last_response.status_code == 201, "signUp is unavailable (503) after retries"
 
     test_user["id"] = last_response.json().get("user", {}).get("id")
     test_user["token"] = last_response.json().get("access_token")
-    test_user["mail_since"] = _started_at
+    test_user["mail_since"] = mail_identity["started_at"]
     assert_profile_not_verified(api_manager, test_user["email"], test_user["password"])
     yield test_user
     _delete_user_try_passwords(
@@ -178,28 +170,29 @@ def verified_registered_user(api_manager, test_user):
     Email — `local+tag@domain` на MAIL_EMAIL (иначе IMAP не найдёт письмо верификации).
     """
     require_mail_creds()
+    mail_identity = {"started_at": None}
     started_at, _tag, recipient_email, password, username = new_plus_tagged_email()
+    mail_identity["started_at"] = started_at
     test_user["email"] = recipient_email
     test_user["password"] = password
     test_user["username"] = username
-    last_response = None
-    for attempt in range(5):
-        last_response = api_manager.auth_api.register_user(
-            test_user, expected_status=[201, 503, 409]
-        )
-        if last_response.status_code == 201:
-            break
-        started_at, _tag, recipient_email, password, username = new_plus_tagged_email()
-        test_user["email"] = recipient_email
-        test_user["password"] = password
-        test_user["username"] = username
-        time.sleep(2 * (attempt + 1))
 
-    assert last_response is not None
+    def _refresh_mail_identity(_attempt: int, _response) -> None:
+        new_started_at, _new_tag, new_email, new_password, new_username = new_plus_tagged_email()
+        mail_identity["started_at"] = new_started_at
+        test_user["email"] = new_email
+        test_user["password"] = new_password
+        test_user["username"] = new_username
+
+    last_response = register_user_with_retries(
+        api_manager, test_user, on_retry=_refresh_mail_identity
+    )
     assert last_response.status_code == 201, "signUp is unavailable (503) after retries"
 
     test_user["id"] = last_response.json().get("user", {}).get("id")
     test_user["token"] = last_response.json().get("access_token")
+    started_at = mail_identity["started_at"]
+    assert started_at is not None
     api_manager.auth_api.authenticate((test_user["email"], test_user["password"]))
     user_id = profile_user_id(api_manager.auth_api.profile().json())
     verify_api_registered_user_email(
@@ -226,13 +219,7 @@ def logged_in_user(api_manager, registered_user):
         "username": registered_user["email"],
         "password": registered_user["password"],
     }
-    last_login = None
-    for attempt in range(5):
-        last_login = api_manager.auth_api.login_user(login_data, expected_status=[201, 503])
-        if last_login.status_code == 201:
-            break
-        time.sleep(2 * (attempt + 1))
-    assert last_login is not None
+    last_login = login_user_with_retries(api_manager, login_data)
     assert last_login.status_code == 201, "login is unavailable (503) after retries"
 
     api_manager.auth_api.authenticate((registered_user["email"], registered_user["password"]))
@@ -248,13 +235,7 @@ def static_user(api_manager):
         "username": VerifiedUserCreds.EMAIL,
         "password": VerifiedUserCreds.PASSWORD,
     }
-    last_login = None
-    for attempt in range(5):
-        last_login = api_manager.auth_api.login_user(login_data, expected_status=[201, 503])
-        if last_login.status_code == 201:
-            break
-        time.sleep(2 * (attempt + 1))
-    assert last_login is not None
+    last_login = login_user_with_retries(api_manager, login_data)
     assert last_login.status_code == 201, "static user login is unavailable (503) after retries"
 
     data_user = last_login.json()
