@@ -113,19 +113,19 @@ jobs:
             : "${VERIFIED_USER_PASSWORD:?VERIFIED_USER_PASSWORD secret is required for ui-payment}"
             export APP_BASE_URL="${APP_BASE_URL:-https://app.yeatwork.ru}"
             export CI=true
-            uv run pytest -q \
-              tests/ui/subscription/test_subscription_payment_ui.py \
-              --alluredir=allure-results --testit
-
+            payment_targets=(
+              tests/ui/subscription/test_subscription_payment_ui.py
+            )
             if [ -n "${MAIL_HOST:-}" ] && [ -n "${MAIL_EMAIL:-}" ] && [ -n "${MAIL_PASSWORD:-}" ]; then
-              echo "UI payment TC 116: full tariff checkout (MAIL_* + RUN_MAIL_INTEGRATION=1)"
+              echo "UI payment suite includes TC 116 (MAIL_* + RUN_MAIL_INTEGRATION=1)"
               export RUN_MAIL_INTEGRATION=1
-              uv run pytest -q \
-                tests/ui/subscription/test_subscription_tariff_card_desktop.py \
-                --alluredir=allure-results --testit
+              payment_targets+=(
+                tests/ui/subscription/test_subscription_tariff_card_desktop.py
+              )
             else
               echo "Skipping TC 116: MAIL_HOST / MAIL_EMAIL / MAIL_PASSWORD not set"
             fi
+            uv run pytest -q "${payment_targets[@]}" --alluredir=allure-results --testit
           }
 
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.scope }}" = "mail" ]; then

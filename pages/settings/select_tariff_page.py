@@ -1,5 +1,6 @@
 import re
 
+import pytest
 from playwright.sync_api import Page, expect
 
 from pages.interview.onboarding_modal import OnboardingModal
@@ -8,6 +9,21 @@ from pages.interview.onboarding_modal import OnboardingModal
 _PREMIUM_TARIFF_RE = re.compile(
     r"Премиум\s+на\s+3|Премиум.{0,30}3\s*месяц|3\s*месяц.{0,30}Премиум|1080|1\s*080",
     re.I,
+)
+
+# YH-2137: stage placeholder instead of tariff cards (TC 116 / nightly ui-payment).
+# CLEANUP ticket for lead: remove this block when product restores select-tariff UI.
+# Done when: /settings#select-tariff shows «Подписаться» on tariff cards AND
+#   RUN_MAIL_INTEGRATION=1 pytest tests/ui/subscription/test_subscription_tariff_card_desktop.py -v --headed
+#   passes without SKIPPED.
+_TARIFF_UNAVAILABLE_RE = re.compile(
+    r"информация о тарифах временно недоступна|tariffs?\s+(are\s+)?temporarily unavailable",
+    re.I,
+)
+_TARIFF_STUB_SKIP_REASON = (
+    "YH-2137: Tariff UI stub on stage (/settings#select-tariff). "
+    "Create cleanup ticket to remove _skip_if_tariffs_temporarily_unavailable "
+    "after product restores tariff cards (see TODO in select_tariff_page.py)."
 )
 
 
@@ -81,10 +97,12 @@ class SelectTariffPage:
         """Deep link + онбординг снимаем, пока недоступен блок тарифов."""
         for _ in range(12):
             self.open_select_tariff()
+            self._skip_if_tariffs_temporarily_unavailable()
             if self._is_tariff_section_ready():
                 return
             self._complete_onboarding_if_blocking()
             self.page.wait_for_timeout(400)
+        self._skip_if_tariffs_temporarily_unavailable()
         self.expect_membership_block_visible()
 
     def open_select_tariff_with_active_subscription(self) -> None:
@@ -117,8 +135,21 @@ class SelectTariffPage:
         except AssertionError:
             return False
 
+    def _is_tariff_stub_visible(self) -> bool:
+        return self.page.get_by_text(_TARIFF_UNAVAILABLE_RE).first.is_visible(timeout=2_000)
+
+    def _skip_if_tariffs_temporarily_unavailable(self) -> None:
+        """Runtime skip while stage shows tariff placeholder (YH-2137).
+
+        TODO YH-2137: delete this method, _TARIFF_UNAVAILABLE_RE and _TARIFF_STUB_SKIP_REASON
+        after product task «restore tariffs on stage» is Done and TC 116 passes locally.
+        """
+        if self._is_tariff_stub_visible():
+            pytest.skip(_TARIFF_STUB_SKIP_REASON)
+
     def expect_membership_block_visible(self) -> None:
         """Тарифы для оформления: блок членства и хотя бы одна кнопка «Подписаться»."""
+        self._skip_if_tariffs_temporarily_unavailable()
         expect(self.page.get_by_text(self._TARIFF_PICKER_TITLE).first).to_be_visible(timeout=15_000)
         expect(self._subscribe_buttons_on_page().first).to_be_visible(timeout=20_000)
 

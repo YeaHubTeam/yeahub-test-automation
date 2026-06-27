@@ -41,14 +41,57 @@ class TBankPaymentPage:
             expect(self.confirm_delete_card).to_be_hidden()
             expect(self.card_number).to_be_visible()
 
+    def _pan_input(self):
+        pan = self.card_number.locator("input")
+        return pan.first if pan.count() else self.card_number
+
+    def _is_pan_prefilled(self) -> bool:
+        pan = self._pan_input()
+        classes = (self.card_number.get_attribute("class") or "") + (
+            pan.get_attribute("class") or ""
+        )
+        if "filled" in classes.lower():
+            return True
+        digits = re.sub(r"\D", "", pan.input_value())
+        return len(digits) >= 4
+
+    def _pan_matches(self, pan_digits: str) -> bool:
+        last4 = pan_digits[-4:]
+        visible = self._pan_input().input_value()
+        if last4 in re.sub(r"\D", "", visible):
+            return True
+        actual = re.sub(r"\D", "", visible)
+        return actual == pan_digits or actual.endswith(last4)
+
+    def _type_digits(self, digits: str) -> None:
+        self.page.keyboard.type(digits, delay=80)
+
     def fill_card(self, card):
         self.remove_saved_card_if_present()
 
-        self.card_number.click()
-        self.card_number.fill("")
-        self.page.keyboard.type(card.number_card.replace(" ", ""), delay=80)
-        self.page.keyboard.type(card.expiry_date.replace("/", ""), delay=80)
-        self.page.keyboard.type(card.cvc, delay=80)
+        pan_digits = card.number_card.replace(" ", "")
+        expiry_digits = card.expiry_date.replace("/", "")
+
+        if self._is_pan_prefilled():
+            # CVC overlay (t-wrapper_active) blocks clicks on PAN/expiry — only focus + keyboard.
+            if self._pan_matches(pan_digits):
+                expiry = self.expiry_date
+                expiry.focus()
+                expiry.press("ControlOrMeta+A")
+                self._type_digits(expiry_digits)
+                self._type_digits(card.cvc)
+            else:
+                pan = self._pan_input()
+                pan.focus()
+                pan.press("ControlOrMeta+A")
+                self._type_digits(pan_digits)
+                self._type_digits(expiry_digits)
+                self._type_digits(card.cvc)
+        else:
+            self.card_number.click()
+            self._type_digits(pan_digits)
+            self._type_digits(expiry_digits)
+            self._type_digits(card.cvc)
 
     def submit_payment(self):
         self.pay_button.click()
