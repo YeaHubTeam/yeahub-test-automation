@@ -54,7 +54,11 @@ UI payment — ТК 116, полный checkout (`MAIL_*` в `.env`, `RUN_MAIL_IN
 RUN_MAIL_INTEGRATION=1 uv run pytest tests/ui/subscription/test_subscription_tariff_card_desktop.py -v
 ```
 
-Integration `scope=ui-payment`: нужны оба набора — `VERIFIED_USER_*` и `MAIL_*`.
+На stage с заглушкой тарифов ожидай **SKIPPED** (runtime skip, TODO YH-2137 в `select_tariff_page.py`).
+
+Integration CI до PR: push ветки → `Actions → Integration (Live) → Run workflow` → выбрать ветку → `scope=ui-payment` / `scope=mail`.
+
+Integration `scope=ui-payment`: нужны оба набора — `VERIFIED_USER_*` и `MAIL_*`; payment и TC 116 в **одном** `pytest`.
 
 ## Чеклист
 - [ ] Линтер пройден (`ruff check .` и `ruff format --check .`)
