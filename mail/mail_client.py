@@ -36,37 +36,53 @@ class MailClient:
 
         return messages
 
+    @staticmethod
+    def _normalize_utc(dt: datetime) -> datetime:
+        if dt.tzinfo is None:
+            return dt.replace(tzinfo=timezone.utc)
+        return dt
+
+    def _message_matches_filters(
+        self,
+        message: MailMessage,
+        *,
+        subject: str,
+        to_contains: str | None,
+        since: datetime | None,
+        min_date: datetime | None,
+    ) -> bool:
+        if subject not in (message.subject or ""):
+            return False
+        if to_contains and to_contains not in (message.recipients or ""):
+            return False
+        if not message.date:
+            return since is None and min_date is None
+        msg_date = self._normalize_utc(message.date)
+        if since is not None and msg_date < self._normalize_utc(since):
+            return False
+        if min_date is not None and msg_date < self._normalize_utc(min_date):
+            return False
+        return True
+
     def find_message(
         self,
         subject: str,
         *,
         to_contains: str | None = None,
         since: datetime | None = None,
+        min_date: datetime | None = None,
     ) -> MailMessage:
         messages = self.get_messages()
         matched_messages: list[MailMessage] = []
 
         for message in messages:
-            subject_matches = subject in (message.subject or "")
-            to_matches = True
-            if to_contains:
-                to_matches = to_contains in (message.recipients or "")
-            since_matches = True
-            if since:
-                # If message has no date, don't match it when since-filter is requested
-                if not message.date:
-                    since_matches = False
-                else:
-                    msg_date = message.date
-                    since_dt = since
-                    # Normalize naive datetimes to UTC to avoid TypeError on comparison
-                    if msg_date.tzinfo is None:
-                        msg_date = msg_date.replace(tzinfo=timezone.utc)
-                    if since_dt.tzinfo is None:
-                        since_dt = since_dt.replace(tzinfo=timezone.utc)
-                    since_matches = msg_date >= since_dt
-
-            if subject_matches and to_matches and since_matches:
+            if self._message_matches_filters(
+                message,
+                subject=subject,
+                to_contains=to_contains,
+                since=since,
+                min_date=min_date,
+            ):
                 matched_messages.append(message)
 
         if not matched_messages:
@@ -83,6 +99,7 @@ class MailClient:
         *,
         to_contains: str | None = None,
         since: datetime | None = None,
+        min_date: datetime | None = None,
         timeout_s: float = 180.0,
         poll_interval_s: float = 3.0,
     ) -> MailMessage:
@@ -95,6 +112,7 @@ class MailClient:
                     subject=subject,
                     to_contains=to_contains,
                     since=since,
+                    min_date=min_date,
                 )
             except MessageNotFoundError as exc:
                 last_error = exc

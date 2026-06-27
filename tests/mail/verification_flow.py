@@ -66,8 +66,10 @@ def wait_imap_verification_link(
     *,
     recipient_email: str,
     since: datetime,
+    min_date: datetime | None = None,
     timeout_s: float = 180.0,
     poll_interval_s: float = 3.0,
+    settle_s: float = 5.0,
 ) -> str:
     client = MailClient(
         host=MailCreds.HOST,
@@ -80,9 +82,18 @@ def wait_imap_verification_link(
         subject="Verify Your Email",
         to_contains=recipient_email,
         since=since,
+        min_date=min_date,
         timeout_s=timeout_s,
         poll_interval_s=poll_interval_s,
     )
+    if settle_s > 0:
+        time.sleep(settle_s)
+        message = client.find_message(
+            subject="Verify Your Email",
+            to_contains=recipient_email,
+            since=since,
+            min_date=min_date,
+        )
     link = client.get_message_link(message)
     client.delete_message(message.uid)
     return link
@@ -94,30 +105,40 @@ def wait_imap_verification_link_or_resend(
     user_id: str,
     recipient_email: str,
     since: datetime,
+    min_date: datetime | None = None,
     imap_first_timeout_s: float = 90.0,
     imap_after_resend_timeout_s: float = 180.0,
     poll_interval_s: float = 3.0,
+    settle_s: float = 5.0,
 ) -> str:
     """Сначала ждём письмо из ящика (часто уже отправлено при UI sign-up).
 
     Если за `imap_first_timeout_s` письма нет — дергаем send-verification-email
     (с ретраями на rate limit) и снова ждём IMAP. Так реже попадаем в 403 сразу
     после регистрации, когда письмо уже ушло.
+
+    `min_date` — только письма после UI resend (шаг 3 ТК 422); backend принимает
+    токен только из последнего письма. `settle_s` — пауза и повторный выбор самого
+    нового письма, если второе пришло сразу после первого match.
     """
     try:
         return wait_imap_verification_link(
             recipient_email=recipient_email,
             since=since,
+            min_date=min_date,
             timeout_s=imap_first_timeout_s,
             poll_interval_s=poll_interval_s,
+            settle_s=settle_s,
         )
     except MessageNotFoundError:
         send_verification_email_with_retries(api_manager, user_id)
         return wait_imap_verification_link(
             recipient_email=recipient_email,
             since=since,
+            min_date=min_date,
             timeout_s=imap_after_resend_timeout_s,
             poll_interval_s=poll_interval_s,
+            settle_s=settle_s,
         )
 
 
@@ -153,6 +174,25 @@ def assert_profile_verified(api_manager: ApiManager, email: str, password: str) 
     api_manager.auth_api.authenticate((email, password))
     profile = api_manager.auth_api.profile().json()
     assert profile_is_verified(profile), "User email is not verified after verification link"
+
+
+def wait_until_profile_verified(
+    api_manager: ApiManager,
+    email: str,
+    password: str,
+    *,
+    timeout_s: float = 60.0,
+    poll_s: float = 2.0,
+) -> None:
+    """Ждём isVerified=true после verify во второй вкладке (SPA/API eventual consistency)."""
+    deadline = time.time() + timeout_s
+    while time.time() < deadline:
+        api_manager.auth_api.authenticate((email, password))
+        profile = api_manager.auth_api.profile().json()
+        if profile_is_verified(profile):
+            return
+        time.sleep(poll_s)
+    assert_profile_verified(api_manager, email, password)
 
 
 def verify_api_registered_user_email(

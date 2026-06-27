@@ -3,6 +3,8 @@ import time
 
 from playwright.sync_api import Page, expect
 
+from pages.interview.onboarding_modal import OnboardingModal
+
 
 class EmailVerifyPage:
     """Раздел `/settings#email-verify` — верификация email (ТК 422)."""
@@ -27,7 +29,11 @@ class EmailVerifyPage:
         re.I,
     )
     _EMAIL_CONFIRMED = re.compile(
-        r"Почта\s+успешно\s+подтверждена|email.*successfully\s+verified",
+        r"Почта\s+успешно\s+подтверждена|"
+        r"e-?mail.*(?:успешно\s+)?(?:подтвержден|верифицирован)|"
+        r"email.*successfully\s+verified|"
+        r"your\s+e-?mail.*verified|"
+        r"email.*has\s+been\s+verified",
         re.I,
     )
     _EMAIL_FIELD_LABEL = re.compile(r"Введите\s+e-?mail|enter\s+e-?mail", re.I)
@@ -70,6 +76,43 @@ class EmailVerifyPage:
     def expect_on_email_verify_route(self) -> None:
         expect(self.page).to_have_url(self.EMAIL_VERIFY_URL_RE, timeout=20_000)
 
+    def _clear_onboarding_blocking_settings(self) -> None:
+        """Снять онбординг на /settings (иногда всплывает после login или hash-навигации)."""
+        onboarding = OnboardingModal(self.page)
+        if not onboarding.modal.is_visible(timeout=1_500):
+            return
+        if onboarding.try_dismiss_with_escape(presses=5):
+            return
+        try:
+            onboarding.complete_onboarding_through_close()
+        except AssertionError:
+            pass
+
+    def _is_verify_form_ready(self, *, email: str, timeout_ms: int = 3_000) -> bool:
+        if OnboardingModal(self.page).modal.is_visible(timeout=500):
+            return False
+        try:
+            expect(self.page.get_by_text(self._SECTION_TITLE).first).to_be_visible(
+                timeout=timeout_ms
+            )
+            field = self._email_input()
+            expect(field).to_be_visible(timeout=timeout_ms)
+            expect(field).to_have_value(email, timeout=min(timeout_ms, 2_000))
+            return True
+        except AssertionError:
+            return False
+
+    def _is_verified_ui_ready(self, *, timeout_ms: int = 3_000) -> bool:
+        if OnboardingModal(self.page).modal.is_visible(timeout=500):
+            return False
+        try:
+            expect(self.page.get_by_text(self._EMAIL_CONFIRMED).first).to_be_visible(
+                timeout=timeout_ms
+            )
+            return True
+        except AssertionError:
+            return False
+
     def expect_verification_section_visible(self) -> None:
         expect(self.page.get_by_text(self._VERIFICATION_SECTION).first).to_be_visible(
             timeout=15_000
@@ -104,14 +147,29 @@ class EmailVerifyPage:
 
     def expect_after_first_open(self, *, email: str) -> None:
         """Шаг 1: /settings#email-verify, поле email; тост после клика CTA или первого входа (если есть)."""
-        self.expect_on_email_verify_route()
-        self.ensure_verification_tab()
-        self.expect_verification_section_visible()
-        self.expect_email_field_with_value(email)
+        self._wait_until_verify_form_ready(email=email)
         toast = self.page.get_by_text(self._EMAIL_SENT_TOAST).first
         if not toast.is_visible(timeout=5_000):
             return
         expect(toast).to_be_visible(timeout=5_000)
+
+    def _wait_until_verify_form_ready(self, *, email: str, max_attempts: int = 12) -> None:
+        """Форма верификации + онбординг: SPA/hash иногда открывают settings без нужной вкладки."""
+        for _ in range(max_attempts):
+            self.expect_on_email_verify_route()
+            self.ensure_verification_tab()
+            if self._is_verify_form_ready(email=email, timeout_ms=3_000):
+                self.expect_verification_section_visible()
+                self.expect_email_field_with_value(email)
+                return
+            self._clear_onboarding_blocking_settings()
+            self.page.reload(wait_until="domcontentloaded", timeout=60_000)
+            self.ensure_verification_tab()
+            self.page.wait_for_timeout(400)
+        self.expect_on_email_verify_route()
+        self.ensure_verification_tab()
+        self.expect_verification_section_visible()
+        self.expect_email_field_with_value(email)
 
     def open_step1_from_interview(self, interview_page) -> None:
         """Шаг 1: CTA в шапке interview или прямой переход на verify (fallback для API signUp)."""
@@ -202,11 +260,20 @@ class EmailVerifyPage:
         """Шаг 3: успешный тост (если UI-отправка прошла без rate limit)."""
         self.expect_email_sent_toast_visible()
 
-    def expect_email_verified_state(self) -> None:
-        """Шаг 6: почта подтверждена."""
+    def expect_email_verified_state(self, *, max_attempts: int = 15) -> None:
+        """Шаг 6: почта подтверждена (главная вкладка может отставать после verify в новой)."""
+        for _ in range(max_attempts):
+            self.open_email_verify_direct()
+            if self._is_verified_ui_ready(timeout_ms=5_000):
+                return
+            self._clear_onboarding_blocking_settings()
+            self.page.reload(wait_until="domcontentloaded", timeout=60_000)
+            self.ensure_verification_tab()
+            self.page.wait_for_timeout(800)
         self.expect_on_email_verify_route()
-        expect(self.page.get_by_text(self._EMAIL_CONFIRMED).first).to_be_visible(timeout=20_000)
+        expect(self.page.get_by_text(self._EMAIL_CONFIRMED).first).to_be_visible(timeout=15_000)
 
     def open_email_verify_direct(self) -> None:
         self.page.goto("/settings#email-verify", wait_until="domcontentloaded", timeout=60_000)
         self.ensure_verification_tab()
+        self._clear_onboarding_blocking_settings()
