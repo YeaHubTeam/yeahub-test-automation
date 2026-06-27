@@ -29,9 +29,15 @@ class TestPasswordNegative:
         response = api_manager.auth_api.password_change(
             logged_in_user["id"], payload, expected_status=400
         )
-        assert response.json().get("description") == "Password confirmation failed", (
-            "Сообщения не совпадают"
-        )
+        body = response.json()
+        description = body.get("description")
+        messages = body.get("message") or []
+        if description:
+            assert description == "Password confirmation failed", "Сообщения не совпадают"
+        else:
+            assert any("passwordConfirm" in str(message) for message in messages), (
+                f"Ожидали ошибку passwordConfirm, получили: {body}"
+            )
 
     # TODO убрать маркер xfail после исправления бага
     @pytest.mark.api

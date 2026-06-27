@@ -1,10 +1,21 @@
+import os
+
 import allure
 import pytest
 
 from pages.payment.tbank_payment_page import TBankPaymentPage
 from payloads.card_payload import CardPayload
+from tests.ui.flows.register_mail_interview_flow import require_mail_creds
 
-pytestmark = [pytest.mark.ui, pytest.mark.integration, pytest.mark.regression]
+pytestmark = [
+    pytest.mark.ui,
+    pytest.mark.integration,
+    pytest.mark.regression,
+    pytest.mark.skipif(
+        os.getenv("RUN_MAIL_INTEGRATION") != "1",
+        reason="Run with RUN_MAIL_INTEGRATION=1 (signUp + IMAP verify in fixture)",
+    ),
+]
 
 
 @pytest.mark.ui
@@ -12,6 +23,7 @@ pytestmark = [pytest.mark.ui, pytest.mark.integration, pytest.mark.regression]
 class TestSubscriptionPaymentUI:
     @allure.title("Успешная покупка подписки валидной картой")
     def test_user_can_buy_subscription_with_valid_card(self, page, payment_link_subscriptions):
+        require_mail_creds()
         payment_page = TBankPaymentPage(page)
 
         payment_page.open(payment_link_subscriptions)
@@ -24,6 +36,7 @@ class TestSubscriptionPaymentUI:
     def test_user_cannot_buy_subscription_with_declined_card(
         self, page, payment_link_subscriptions
     ):
+        require_mail_creds()
         payment_page = TBankPaymentPage(page)
 
         payment_page.open(payment_link_subscriptions)

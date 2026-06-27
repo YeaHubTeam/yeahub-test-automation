@@ -79,8 +79,6 @@ cp .env.example .env
 
 Проект использует следующие переменные:
 
-- `VERIFIED_USER_EMAIL`
-- `VERIFIED_USER_PASSWORD`
 - `MAIL_HOST`
 - `MAIL_PORT`
 - `MAIL_EMAIL`
@@ -91,8 +89,7 @@ cp .env.example .env
 
 ### Для чего они нужны
 
-- `VERIFIED_USER_EMAIL`, `VERIFIED_USER_PASSWORD` используются фикстурой `static_user` для subscription/payment integration-тестов
-- `MAIL_*` используются mail-слоем для подключения к IMAP-ящику
+- `MAIL_*` используются mail-слоем (IMAP) и фикстурами `verified_registered_user` / `verified_subscription_user` для subscription/payment integration-тестов
 - `RUN_MAIL_INTEGRATION` включает живой integration-тест для почтового flow
 
 ## Запуск тестов
@@ -130,9 +127,9 @@ uv run pytest --collect-only
 - запускается вручную через `Actions -> Integration (Live) -> Run workflow`
 - запускается автоматически ночью по `schedule` (основной job + отдельный **mail-e2e**)
 - `scope=smoke` запускает `pytest -m "smoke and integration and not ui"` (без Playwright UI)
-- `scope=full` и ночной прогон (`schedule`) основного job: `pytest -m "integration and not ui"`, затем UI auth smoke (как `scope=ui-auth`: login ТК 409, register form, onboarding ТК 459, register page opens, change password ТК 113, delete account ТК 117) и UI payment (если заданы `VERIFIED_USER_*`)
+- `scope=full` и ночной прогон (`schedule`) основного job: `pytest -m "integration and not ui"`, затем UI auth smoke (как `scope=ui-auth`: login ТК 409, register form, onboarding ТК 459, register page opens, change password ТК 113, delete account ТК 117) и UI payment (если заданы `MAIL_*`)
 - `scope=ui-auth`: Playwright auth/interview smoke — login (ТК 409), `test_register_form_desktop` (faker email, **без** `MAIL_*`), `test_onboarding_after_register_desktop` (ТК 459), `test_register_page_opens`, change password (ТК 113), delete account (ТК 117; `registered_user`, без IMAP) (`--testit`, `APP_BASE_URL` по умолчанию `https://app.yeatwork.ru`)
-- `scope=ui-payment`: один `pytest` — `test_subscription_payment_ui.py` (`VERIFIED_USER_*`) и при наличии `MAIL_*` — `test_subscription_tariff_card_desktop.py` (ТК 116; `RUN_MAIL_INTEGRATION=1`)
+- `scope=ui-payment`: один `pytest` — `test_subscription_payment_ui.py` и `test_subscription_tariff_card_desktop.py` (ТК 116); нужны `MAIL_*`, `RUN_MAIL_INTEGRATION=1`
 - `scope=mail`: API verify-email (ТК 466) + UI email verify (ТК 422) + Playwright register→IMAP (52) + **forgot password (ТК 115)** с `RUN_MAIL_INTEGRATION=1`, `--testit`, `APP_BASE_URL` по умолчанию `https://app.yeatwork.ru` (тайминги same-email для регистрационного e2e — дефолты в коде, как при локальном запуске). Онбординг ТК 459 — в `scope=ui-auth`.
 - ночной job **mail-e2e** (только `schedule`): те же mail-тесты, что и при `scope=mail` (API verify-email 466, UI email verify 422, register→IMAP, forgot password 115), плюс `MAIL_*` secrets и Chromium для Playwright
 - перед тестами выполняется preflight API healthcheck (`/subscriptions` + доступность `/auth/refresh`): в Integration CI до **8 попыток** с паузой **15 с** между ними
@@ -141,8 +138,7 @@ uv run pytest --collect-only
 - после каждого manual/nightly run сохраняются artifacts `allure-results-<run_number>` и `allure-report-<run_number>`
 
 Для `Integration CI` в GitHub Actions должны быть заведены repository secrets:
-- `VERIFIED_USER_EMAIL`, `VERIFIED_USER_PASSWORD` — UI payment по API-ссылке (`test_subscription_payment_ui.py`)
-- `MAIL_HOST`, `MAIL_PORT`, `MAIL_EMAIL`, `MAIL_PASSWORD`, `MAIL_FOLDER` — mail e2e, nightly **mail-e2e** и ТК 116 (`test_subscription_tariff_card_desktop.py`); для `scope=ui-payment` нужны **оба** набора (`VERIFIED_USER_*` + `MAIL_*`)
+- `MAIL_HOST`, `MAIL_PORT`, `MAIL_EMAIL`, `MAIL_PASSWORD`, `MAIL_FOLDER` — mail e2e, subscription API/UI payment, nightly **mail-e2e**, `scope=ui-payment`
 - при использовании Test IT — `TMS_*` (см. workflow)
 
 Artifacts доступны на странице конкретного workflow run в GitHub Actions.
@@ -183,7 +179,7 @@ Artifacts доступны на странице конкретного workflow
 - integration-тест не запускается автоматически
 - такой тест лучше использовать как ручную live-проверку
 - для CI mail flow: nightly job **mail-e2e** и manual `scope=mail` в Integration workflow (нужны secrets `MAIL_*`); локально — `.env` и `RUN_MAIL_INTEGRATION=1`
-- retry на 503: `tests/mail/signup_retry.py` (фикстуры `registered_user`, `unverified_mail_registered_user`, `verified_registered_user`, login в `logged_in_user` / `static_user`)
+- retry на 503: `tests/mail/signup_retry.py` (фикстуры `registered_user`, `unverified_mail_registered_user`, `verified_registered_user`, `verified_subscription_user`, login в `logged_in_user`)
 
 ### Smoke: проверка IMAP-клиента и парсинга ссылки
 
@@ -331,22 +327,32 @@ uv run pytest tests/ui/settings/test_delete_account_desktop.py::test_delete_acco
 
 С браузером: `--headed`. Test IT: `--testit`, `externalId`: `yeahub-ui-settings-delete-account-desktop-117`. CI: `scope=ui-auth` (~20 s).
 
+### API integration: подписки (payment/init, cleanup)
+
+`tests/api/subscription/` — live API-тесты подписок. Фикстура `verified_subscription_user` создаёт ephemeral-пользователя через signUp + IMAP verify (как mail e2e), поэтому нужны **`MAIL_*` в `.env`** (отдельно от `RUN_MAIL_INTEGRATION`).
+
+```bash
+uv run pytest tests/api/subscription/ -v
+```
+
+CI: nightly Integration (`integration and not ui`) и `scope=smoke` — secrets `MAIL_*` уже в workflow.
+
 ### UI E2E (Playwright): оплата подписки (T-Bank)
 
-`tests/ui/subscription/test_subscription_payment_ui.py` — UI оплаты по ссылке из API (`static_user` / `VERIFIED_USER_*` в secrets).
+`tests/ui/subscription/test_subscription_payment_ui.py` — UI оплаты по ссылке из API (`verified_registered_user`, fresh user per test).
 
 `tests/ui/subscription/test_subscription_tariff_card_desktop.py` — ТК 116: signUp + IMAP verify → тариф в settings → модалка → T-Bank → активная подписка (`verified_registered_user`, teardown delete user).
 
 **Stage stub (YH-2137):** пока на `/settings#select-tariff` заглушка «Информация о тарифах временно недоступна», тест уходит в **SKIPPED** (runtime skip в `pages/settings/select_tariff_page.py`, TODO YH-2137). Когда продукт вернёт тарифы — убрать guard и прогнать headed; завести cleanup-тикет у лида.
 
 ```bash
-uv run pytest tests/ui/subscription/test_subscription_payment_ui.py -v
+RUN_MAIL_INTEGRATION=1 uv run pytest tests/ui/subscription/test_subscription_payment_ui.py -v
 RUN_MAIL_INTEGRATION=1 uv run pytest tests/ui/subscription/test_subscription_tariff_card_desktop.py -v --headed
 ```
 
-Test IT: `--testit`, `externalId`: `yeahub-ui-subscription-tariff-card-desktop-116`. Для 116 нужны `MAIL_*` в `.env` (как mail e2e).
+Test IT: `--testit`, `externalId`: `yeahub-ui-subscription-tariff-card-desktop-116`. Нужны `MAIL_*` в `.env` (как mail e2e).
 
-CI: Integration workflow, scope `ui-payment` — один `pytest`: API-link smoke (`VERIFIED_USER_*`); ТК 116 при `MAIL_*` + `RUN_MAIL_INTEGRATION=1` (пока заглушка тарифов на stage — **SKIPPED**, не FAILED).
+CI: Integration workflow, scope `ui-payment` — один `pytest`: payment UI + ТК 116 при `MAIL_*` + `RUN_MAIL_INTEGRATION=1` (пока заглушка тарифов на stage — **SKIPPED**, не FAILED).
 
 ### UI E2E (Playwright): регистрация в браузере → IMAP → онбординг → удаление → опционально тот же email
 

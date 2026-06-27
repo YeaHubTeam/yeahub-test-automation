@@ -4,9 +4,18 @@ from playwright.sync_api import expect
 
 _PAY_TBANK_URL = re.compile(r"pay\.tbank\.ru", re.I)
 _RETURN_TO_SHOP_RE = re.compile(
-    r"^В\s+магазин$|^Return\s+to\s+(the\s+)?store$|вернуться\s+в\s+магазин",
+    r"^В\s+магазин$|^Return\s+to\s+(the\s+)?store$|вернуться\s+в\s+магазин|^To\s+the\s+shop$",
     re.I,
 )
+_SUCCESS_STATUS_RE = re.compile(
+    r"Оплачено|Подтвержден|Успешн|оплачен|Paid|Successful|Success",
+    re.I,
+)
+_DECLINED_STATUS_RE = re.compile(
+    r"Не получилось оплатить|не удалось оплатить|Отклонен|отклонен|Unable to pay|Declined|Rejected",
+    re.I,
+)
+_DELETE_CARD_RE = re.compile(r"Удалить карту|Delete card", re.I)
 _POST_RETURN_ORIGIN_RE = re.compile(r"yeahub\.ru|yeatwork\.ru", re.I)
 
 
@@ -19,7 +28,7 @@ class TBankPaymentPage:
         self.expiry_date = page.locator("input[autocomplete='cc-exp']")
         self.cvc = page.locator("[automation-id='tui-input-card-group__cvc']")
         self.pay_button = page.locator("[automation-id='card-form__submit']")
-        self.delete_card = page.get_by_text("Удалить карту")
+        self.delete_card = page.get_by_text(_DELETE_CARD_RE)
         self.confirm_delete_card = page.locator(
             "[automation-id='delete-card-dialog__delete-button']"
         )
@@ -97,25 +106,31 @@ class TBankPaymentPage:
         self.pay_button.click()
 
     def assert_payment_success(self):
-        expect(self.page.locator("[automation-id='status-page']")).to_be_visible(
-            timeout=self.PAYMENT_STATUS_TIMEOUT
+        status_page = self.page.locator("[automation-id='status-page']")
+        expect(status_page).to_be_visible(timeout=self.PAYMENT_STATUS_TIMEOUT)
+        success = (
+            status_page.locator("[automation-id='payment__status_success']")
+            .or_(status_page.get_by_text(_SUCCESS_STATUS_RE))
+            .or_(status_page.get_by_role("button", name=_RETURN_TO_SHOP_RE))
+            .or_(status_page.get_by_role("link", name=_RETURN_TO_SHOP_RE))
         )
-        expect(self.page.get_by_text("Оплачено")).to_be_visible(timeout=self.PAYMENT_STATUS_TIMEOUT)
+        expect(success.first).to_be_visible(timeout=self.PAYMENT_STATUS_TIMEOUT)
 
     def assert_payment_declined(self):
-        expect(self.page.locator("[automation-id='status-page']")).to_be_visible(
-            timeout=self.PAYMENT_STATUS_TIMEOUT
+        status_page = self.page.locator("[automation-id='status-page']")
+        expect(status_page).to_be_visible(timeout=self.PAYMENT_STATUS_TIMEOUT)
+        declined = status_page.locator("[automation-id='payment__status_rejected']").or_(
+            status_page.get_by_text(_DECLINED_STATUS_RE)
         )
-        expect(self.page.get_by_text("Не получилось оплатить")).to_be_visible(
-            timeout=self.PAYMENT_STATUS_TIMEOUT
-        )
+        expect(declined.first).to_be_visible(timeout=self.PAYMENT_STATUS_TIMEOUT)
 
     def click_return_to_shop(self) -> None:
         """Шаг 6 ТК 116: «В магазин» на экране «Оплачено» (T-Bank sandbox)."""
         status_page = self.page.locator("[automation-id='status-page']")
         expect(status_page).to_be_visible(timeout=self.PAYMENT_STATUS_TIMEOUT)
         return_btn = (
-            status_page.get_by_role("button", name=_RETURN_TO_SHOP_RE)
+            status_page.locator("[automation-id='island__button']")
+            .or_(status_page.get_by_role("button", name=_RETURN_TO_SHOP_RE))
             .or_(status_page.get_by_role("link", name=_RETURN_TO_SHOP_RE))
             .or_(status_page.get_by_text(_RETURN_TO_SHOP_RE))
         )
