@@ -113,14 +113,9 @@ jobs:
             export RUN_MAIL_INTEGRATION=1
             export APP_BASE_URL="${APP_BASE_URL:-https://app.yeatwork.ru}"
             export CI=true
-            payment_tests="tests/ui/subscription/test_subscription_payment_ui.py"
-            if [ "${INCLUDE_TARIFF_CARD_TEST:-1}" = "1" ]; then
-              payment_tests="${payment_tests} tests/ui/subscription/test_subscription_tariff_card_desktop.py"
-            else
-              echo "Skipping TC 116 in this run (tariff stub on stage; use scope=ui-payment to include it)"
-            fi
             uv run pytest -q \
-              ${payment_tests} \
+              tests/ui/subscription/test_subscription_payment_ui.py \
+              tests/ui/subscription/test_subscription_tariff_card_desktop.py \
               --alluredir=allure-results --testit
           }
 
@@ -165,7 +160,7 @@ jobs:
           if [ "${RUN_UI_AFTER_API}" = "true" ]; then
             run_ui_auth_smoke
             if [ -n "${MAIL_HOST:-}" ] && [ -n "${MAIL_EMAIL:-}" ] && [ -n "${MAIL_PASSWORD:-}" ]; then
-              INCLUDE_TARIFF_CARD_TEST=0 run_ui_payment
+              run_ui_payment
             else
               echo "Skipping UI payment: MAIL_HOST / MAIL_EMAIL / MAIL_PASSWORD not set"
             fi
