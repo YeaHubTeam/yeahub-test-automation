@@ -21,11 +21,18 @@ class InterviewPage:
     def expect_on_interview_route(self) -> None:
         expect(self.page).to_have_url(INTERVIEW_URL_RE)
 
-    def expect_authorized_after_login(self, *, username: str, email: str | None = None) -> None:
+    def expect_authorized_after_login(
+        self,
+        *,
+        username: str,
+        email: str | None = None,
+        dismiss_onboarding: bool = True,
+    ) -> None:
         """Шаг 4 ТК 409: /interview + активная сессия (имя/email в шапке или аватар-меню)."""
         expect(self.page).to_have_url(INTERVIEW_URL_RE, timeout=20_000)
         expect(self.page).not_to_have_url(re.compile(r".*/auth/login", re.I), timeout=10_000)
-        self.complete_onboarding_if_blocking_interview()
+        if dismiss_onboarding:
+            self.complete_onboarding_if_blocking_interview()
         self._expect_session_identity_visible(username=username, email=email)
 
     def _header_profile_trigger(self):

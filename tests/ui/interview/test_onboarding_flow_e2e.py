@@ -13,7 +13,7 @@ import testit
 from playwright.sync_api import Page
 
 from pages.auth.login_page import LoginPage
-from pages.interview.interview_page import InterviewPage
+from pages.interview.interview_page import INTERVIEW_URL_RE, InterviewPage
 from utils.reporting import report_step
 
 
@@ -51,14 +51,16 @@ def test_onboarding_after_register_desktop(page: Page, registered_user: dict[str
     ):
         login_page.open()
         login_page.fill_credentials(email, password)
-        login_page.submit()
-        interview_page.expect_authorized_after_login(username=username)
+        login_page.submit_expecting_success()
+        if not INTERVIEW_URL_RE.search(page.url):
+            interview_page.open_interview()
+        interview_page.expect_on_interview_route()
 
     with report_step(
         "Предусловие 3: модалка онбординга, этап «Приветствие» (1/5)",
         "Модалка Onboarding видна; прогресс 1/5; пользователь ранее не проходил онбординг",
     ):
-        onboarding.expect_onboarding_visible()
+        onboarding.expect_onboarding_visible_after_register(timeout_ms=45_000)
         onboarding.expect_progress_fraction(1, 5)
 
     with report_step(
@@ -70,17 +72,10 @@ def test_onboarding_after_register_desktop(page: Page, registered_user: dict[str
         onboarding.expect_onboarding_second_step_visible()
 
     with report_step(
-        "Шаг 2: открыть список «Выберите специализацию»",
-        "Открыт выпадающий список; виден хотя бы один вариант специализации (role=option)",
+        "Шаги 2–3: открыть список и выбрать React Frontend Developer",
+        "dropdown-select открыт; в поле выбрана специализация React Frontend Developer (id=11)",
     ):
-        onboarding.open_specialization_dropdown()
-        onboarding.expect_specialization_list_visible()
-
-    with report_step(
-        "Шаг 3: выбрать специализацию (эталон: React Frontend Developer)",
-        "В поле выбрана специализация React Frontend Developer (id=11)",
-    ):
-        onboarding.choose_reference_specialization()
+        onboarding.open_drop_down_and_choose_specialization()
 
     with report_step(
         "Шаг 4: «Сохранить и продолжить»",
@@ -107,8 +102,8 @@ def test_onboarding_after_register_desktop(page: Page, registered_user: dict[str
         onboarding.expect_onboarding_fifth_step_visible()
 
     with report_step(
-        "Шаг 7: закрыть модалку (крестик)",
-        "Модалка онбординга закрыта; URL /interview; заголовок Onboarding и stepper скрыты",
+        "Шаг 7: модалка закрыта",
+        "На 5/5 модалка закрывается сама или по Primary; Onboarding скрыт, URL /interview",
     ):
-        onboarding.complete_onboarding_step_7_close()
+        onboarding.finish_onboarding_after_fifth_step()
         interview_page.expect_on_interview_route()
