@@ -1,6 +1,7 @@
 import pytest
 
 from payloads.auth_payloads import AuthPayloads
+from tests.mail.signup_retry import password_change_with_retries
 from utils.data_generator import DataGenerator
 
 pytestmark = [pytest.mark.api, pytest.mark.integration, pytest.mark.regression, pytest.mark.pr_safe]
@@ -11,7 +12,7 @@ class TestPasswordPositive:
     def test_changing_password(self, logged_in_user, api_manager):
         """Смена пароля"""
         payload = AuthPayloads.payload_password()
-        response = api_manager.auth_api.password_change(logged_in_user["id"], payload)
+        response = password_change_with_retries(api_manager, logged_in_user["id"], payload)
         assert response.json().get("access_token") is not None, "Токен не найден"
 
     @pytest.mark.api
@@ -19,7 +20,7 @@ class TestPasswordPositive:
     def test_changing_password_and_login(self, logged_in_user, api_manager):
         """Смена пароля и логин под новым паролем"""
         payload = AuthPayloads.payload_password()
-        response = api_manager.auth_api.password_change(logged_in_user["id"], payload)
+        response = password_change_with_retries(api_manager, logged_in_user["id"], payload)
         assert response.json().get("access_token") is not None, "Токен не найден"
 
         api_manager.auth_api.logout()

@@ -107,3 +107,35 @@ def authenticate_with_retries(api_manager: ApiManager, email: str, password: str
     if not token:
         raise KeyError(f"Token is missing in login response. Keys found: {list(payload.keys())}")
     api_manager.auth_api._update_session_headers(Authorization=f"Bearer {token}")
+
+
+def password_change_with_retries(
+    api_manager: ApiManager,
+    user_id,
+    payload: dict[str, Any],
+    *,
+    success_status: int | list[int] = 200,
+) -> requests.Response:
+    """password-change with backoff on 503 and transient network errors."""
+    success_set = {success_status} if isinstance(success_status, int) else set(success_status)
+    last_response: requests.Response | None = None
+    for attempt in range(INTEGRATION_MAX_ATTEMPTS):
+        try:
+            last_response = api_manager.auth_api.password_change(
+                user_id,
+                payload,
+                expected_status=list(success_set | {503}),
+            )
+        except _TRANSIENT_NETWORK_ERRORS as exc:
+            if attempt == INTEGRATION_MAX_ATTEMPTS - 1:
+                raise exc
+            time.sleep(integration_retry_sleep_seconds(attempt))
+            continue
+        if last_response.status_code in success_set:
+            return last_response
+        if last_response.status_code == 503:
+            time.sleep(integration_retry_sleep_seconds(attempt))
+            continue
+        assert last_response.status_code in success_set
+    assert last_response is not None
+    return last_response

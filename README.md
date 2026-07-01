@@ -133,7 +133,7 @@ uv run pytest --collect-only
 - `scope=mail`: API verify-email (ТК 466) + UI email verify (ТК 422) + Playwright register→IMAP (52) + **forgot password (ТК 115)** с `RUN_MAIL_INTEGRATION=1`, `--testit`, `APP_BASE_URL` по умолчанию `https://app.yeatwork.ru` (тайминги same-email для регистрационного e2e — дефолты в коде, как при локальном запуске). Онбординг ТК 459 — в `scope=ui-auth`.
 - ночной job **mail-e2e** (только `schedule`): те же mail-тесты, что и при `scope=mail` (API verify-email 466, UI email verify 422, register→IMAP, forgot password 115), плюс `MAIL_*` secrets и Chromium для Playwright
 - перед тестами выполняется preflight API healthcheck (`/subscriptions` + доступность `/auth/refresh`): в Integration CI до **8 попыток** с паузой **15 с** между ними
-- signUp/login в mail-fixtures и API mail e2e: общий retry в `tests/mail/signup_retry.py` (**8 попыток**, backoff `3 × (attempt + 1)` сек) на 503 от stage
+- signUp/login/password-change в integration API: общий retry в `tests/mail/signup_retry.py` (**8 попыток**, backoff `3 × (attempt + 1)` сек) на 503 от stage
 - проверка Integration CI **до PR**: push ветки → `Actions → Integration (Live) → Run workflow` на своей ветке (`scope=mail`, `scope=ui-payment`); PR не обязателен для первого прогона
 - после каждого manual/nightly run сохраняются artifacts `allure-results-<run_number>` и `allure-report-<run_number>`
 
