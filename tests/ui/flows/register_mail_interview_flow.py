@@ -58,8 +58,8 @@ def register_ui_through_interview_first_continue(
     expect(page).to_have_url(re.compile(r".*/auth/register$"))
     register_page.fill_register_form(username, recipient_email, password)
     register_page.check_checkboxes()
-    register_page.submit_registration()
-    register_page.wait_after_successful_register()
+    access_token = register_page.submit_registration()
+    register_page.wait_after_successful_register(access_token=access_token)
 
     interview_page = InterviewPage(page)
     interview_page.expect_on_interview_route()

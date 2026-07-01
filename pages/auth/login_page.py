@@ -140,7 +140,7 @@ class LoginPage:
         if not INTERVIEW_URL_RE.search(self.page.url):
             interview.open_interview()
         interview.complete_onboarding_if_blocking_interview()
-        interview.expect_authorized_after_login(username=username)
+        interview.expect_authorized_after_login(username=username, email=email)
 
     def submit_expecting_unauthorized(self) -> None:
         """ТК 117 шаг 7: login удалённого пользователя → HTTP 401/403, остаёмся на /auth/login."""

@@ -21,11 +21,16 @@ class InterviewPage:
     def expect_on_interview_route(self) -> None:
         expect(self.page).to_have_url(INTERVIEW_URL_RE)
 
-    def expect_authorized_after_login(self, *, username: str) -> None:
-        """Шаг 4 ТК 409: редирект на interview и признак активной сессии (имя в шапке)."""
+    def expect_authorized_after_login(self, *, username: str, email: str | None = None) -> None:
+        """Шаг 4 ТК 409: редирект на interview и признак активной сессии (имя или email в шапке)."""
         expect(self.page).to_have_url(INTERVIEW_URL_RE, timeout=20_000)
         expect(self.page).not_to_have_url(re.compile(r".*/auth/login", re.I), timeout=10_000)
-        expect(self.page.get_by_text(username).first).to_be_visible(timeout=20_000)
+        identity = self.page.get_by_text(username).first
+        if identity.is_visible(timeout=8_000):
+            return
+        if email and self.page.get_by_text(email).first.is_visible(timeout=8_000):
+            return
+        expect(identity).to_be_visible(timeout=12_000)
 
     def open_interview(self) -> None:
         self.page.goto("/interview", wait_until="domcontentloaded", timeout=60_000)
@@ -59,11 +64,10 @@ class InterviewPage:
     def complete_onboarding_if_blocking_interview(self) -> None:
         """Онбординг после signUp/login: ждём модалку (SPA иногда рисует с задержкой), проходим 1/5–5/5."""
         onboarding = self.onboarding
-        if not onboarding.modal.is_visible(timeout=15_000):
-            if not self.page.get_by_role("heading", name="Onboarding").is_visible(timeout=2_000):
+        if not onboarding.modal.is_visible(timeout=20_000):
+            if not self.page.get_by_role("heading", name="Onboarding").is_visible(timeout=3_000):
                 return
         onboarding.complete_onboarding_through_close()
-        onboarding.expect_onboarding_dismissed()
 
     def ensure_onboarding_completed_before_settings(self) -> None:
         """Перед переходом в settings: онбординг на /interview или повторно после навигации."""

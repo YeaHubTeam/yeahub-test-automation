@@ -1,5 +1,6 @@
 import random
 import string
+import uuid
 
 from faker import Faker
 
@@ -28,6 +29,15 @@ class DataGenerator:
     @staticmethod
     def random_email():
         return faker.email()
+
+    @staticmethod
+    def unique_email(domain: str = "example.com") -> str:
+        """Уникальный email для UI signUp — без коллизий faker @example.com на stage."""
+        return f"autotest-{uuid.uuid4().hex}@{domain}"
+
+    @staticmethod
+    def unique_username(prefix: str = "AutoTest") -> str:
+        return f"{prefix} {uuid.uuid4().hex[:12]}"
 
     @staticmethod
     def random_phone():

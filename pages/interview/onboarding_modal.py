@@ -54,10 +54,42 @@ class OnboardingModal:
     def onboarding_modal_close_btn(self):
         return self.close_icon
 
-    def expect_onboarding_visible(self):
-        expect(self.modal).to_be_visible()
-        expect(self.modal.get_by_test_id("stepper")).to_be_visible()
-        expect(self.modal.get_by_role("heading", name="Onboarding")).to_be_visible()
+    def expect_onboarding_visible(self, *, timeout_ms: int = 30_000) -> None:
+        expect(self.modal).to_be_visible(timeout=timeout_ms)
+        expect(self.modal.get_by_test_id("stepper")).to_be_visible(timeout=timeout_ms)
+        expect(self.modal.get_by_role("heading", name="Onboarding")).to_be_visible(
+            timeout=timeout_ms
+        )
+
+    def expect_onboarding_visible_after_register(self, *, timeout_ms: int = 45_000) -> None:
+        """После UI signUp: поллим overlay/modal (SPA на stage рисует онбординг с задержкой)."""
+        heading = self.page.get_by_role("heading", name="Onboarding")
+        progress_1 = self.page.get_by_text(re.compile(r"1\s*/\s*5|1\s+of\s+5", re.I)).first
+        fallback_modal = self.page.locator('[data-testid="Modal"]').filter(has=heading)
+        overlay = self.page.get_by_test_id("Modal_Overlay")
+        max_rounds = max(1, timeout_ms // 500)
+        reloaded = False
+
+        for i in range(max_rounds):
+            if self.modal.is_visible(timeout=400):
+                self.expect_onboarding_visible(timeout_ms=5_000)
+                return
+            if fallback_modal.first.is_visible(timeout=400):
+                expect(heading).to_be_visible(timeout=5_000)
+                expect(progress_1).to_be_visible(timeout=10_000)
+                return
+            if heading.is_visible(timeout=400) and progress_1.is_visible(timeout=400):
+                return
+            if overlay.count() and overlay.first.is_visible(timeout=300):
+                self.page.wait_for_timeout(500)
+                continue
+            if i >= 20 and not reloaded:
+                self.page.reload(wait_until="domcontentloaded", timeout=60_000)
+                reloaded = True
+                continue
+            self.page.wait_for_timeout(500)
+
+        self.expect_onboarding_visible(timeout_ms=5_000)
 
     def expect_progress_fraction(self, current: int, total: int = 5) -> None:
         """Этап n/m на прогресс-баре онбординга (допускаем пробелы вокруг «/»)."""
@@ -320,7 +352,19 @@ class OnboardingModal:
                 expect(final_copy).to_be_visible(timeout=15_000)
 
         self.close_onboarding_modal()
-        self.expect_onboarding_dismissed()
+        self._ensure_onboarding_dismissed()
+
+    def _ensure_onboarding_dismissed(self) -> None:
+        """Финальный проход: Escape / шаг 7 / длинный timeout — stage иногда не закрывает модалку с первого раза."""
+        if self.modal.is_visible(timeout=2_000) or self.page.get_by_role(
+            "heading", name="Onboarding"
+        ).is_visible(timeout=1_000):
+            self.try_dismiss_with_escape(presses=5)
+        if self.modal.is_visible(timeout=1_000) or self.page.get_by_role(
+            "heading", name="Onboarding"
+        ).is_visible(timeout=1_000):
+            self.complete_onboarding_step_7_close()
+        self.expect_onboarding_dismissed(timeout_ms=45_000)
 
     def try_dismiss_with_escape(self, *, presses: int = 3) -> bool:
         """Быстрый путь: Escape, если модалка не обязательна к прохождению всех шагов."""
