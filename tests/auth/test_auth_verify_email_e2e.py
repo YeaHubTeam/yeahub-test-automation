@@ -20,6 +20,7 @@ from tests.mail.verification_flow import (
     delete_authenticated_user_via_api,
     wait_imap_verification_link_or_resend,
 )
+from tests.ui.flows.register_mail_interview_flow import require_mail_creds
 from utils.data_generator import DataGenerator
 
 pytestmark = [
@@ -40,9 +41,7 @@ pytestmark = [
 @testit.title("E2E API: верификация email (signUp → письмо → verify-email → isVerified=true)")
 def test_email_verification_e2e(api_manager: ApiManager):
     """E2E API: верификация email (signUp → письмо → verify-email → isVerified=true)."""
-    assert MailCreds.EMAIL and MailCreds.PASSWORD and MailCreds.HOST, (
-        "Mail creds are not configured. Set MAIL_HOST/MAIL_EMAIL/MAIL_PASSWORD."
-    )
+    require_mail_creds()
 
     recipient_email: str | None = None
     password: str | None = None
