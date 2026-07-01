@@ -67,7 +67,7 @@ def register_user_with_retries(
             continue
         if last_response.status_code == 201:
             return last_response
-        if on_retry is not None:
+        if on_retry is not None and attempt < SIGNUP_MAX_ATTEMPTS - 1:
             on_retry(attempt, last_response)
         time.sleep(integration_retry_sleep_seconds(attempt))
     assert last_response is not None

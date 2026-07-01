@@ -88,12 +88,15 @@ def wait_imap_verification_link(
     )
     if settle_s > 0:
         time.sleep(settle_s)
-        message = client.find_message(
-            subject="Verify Your Email",
-            to_contains=recipient_email,
-            since=since,
-            min_date=min_date,
-        )
+        try:
+            message = client.find_message(
+                subject="Verify Your Email",
+                to_contains=recipient_email,
+                since=since,
+                min_date=min_date,
+            )
+        except MessageNotFoundError:
+            pass
     link = client.get_message_link(message)
     client.delete_message(message.uid)
     return link

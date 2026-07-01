@@ -18,6 +18,9 @@ from utils.helpers import DataUtils
 
 pytestmark = [pytest.mark.api, pytest.mark.integration, pytest.mark.regression]
 
+# Prerequisites: verified_subscription_user / payment_link_subscriptions need MAIL_* (IMAP verify).
+# See README — «API integration: подписки». Without MAIL_* → SKIPPED via require_mail_creds().
+
 
 @pytest.mark.api
 @allure.label("AQA_Engineer", "Nikolay Martoplyas")

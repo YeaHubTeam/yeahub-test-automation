@@ -5,6 +5,7 @@ import re
 import string
 from datetime import datetime, timezone
 
+import pytest
 from playwright.sync_api import Page, expect
 
 from api.api_manager import ApiManager
@@ -22,9 +23,8 @@ from utils.data_generator import DataGenerator
 
 
 def require_mail_creds() -> None:
-    assert MailCreds.EMAIL and MailCreds.PASSWORD and MailCreds.HOST, (
-        "Mail creds are not configured. Set MAIL_HOST/MAIL_EMAIL/MAIL_PASSWORD."
-    )
+    if not (MailCreds.EMAIL and MailCreds.PASSWORD and MailCreds.HOST):
+        pytest.skip("Mail creds are not configured. Set MAIL_HOST/MAIL_EMAIL/MAIL_PASSWORD.")
 
 
 def new_plus_tagged_email() -> tuple[datetime, str, str, str, str]:

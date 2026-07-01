@@ -329,10 +329,18 @@ uv run pytest tests/ui/settings/test_delete_account_desktop.py::test_delete_acco
 
 ### API integration: подписки (payment/init, cleanup)
 
-`tests/api/subscription/` — live API-тесты подписок. Фикстура `verified_subscription_user` создаёт ephemeral-пользователя через signUp + IMAP verify (как mail e2e), поэтому нужны **`MAIL_*` в `.env`** (отдельно от `RUN_MAIL_INTEGRATION`).
+`tests/api/subscription/` — live API-тесты подписок.
+
+**Требуются `MAIL_*` в `.env` (или secrets в CI)** для тестов с `verified_subscription_user` / `payment_link_subscriptions`: фикстура делает signUp + IMAP verify (как mail e2e), без общего `static_user`. **`RUN_MAIL_INTEGRATION=1` для API subscription не нужен** — достаточно `MAIL_HOST`, `MAIL_EMAIL`, `MAIL_PASSWORD` (опционально `MAIL_FOLDER`, `MAIL_PORT`). Без почты эти тесты **SKIPPED**, не FAILED.
+
+`test_subscription_validation.py` и часть negative-тестов (`logged_in_user`) **не требуют** `MAIL_*`.
 
 ```bash
+# полный API subscription (нужны MAIL_*)
 uv run pytest tests/api/subscription/ -v
+
+# только список тарифов / validation (MAIL_* не нужны)
+uv run pytest tests/api/subscription/test_subscription_validation.py -v
 ```
 
 CI: nightly Integration (`integration and not ui`) и `scope=smoke` — secrets `MAIL_*` уже в workflow.
