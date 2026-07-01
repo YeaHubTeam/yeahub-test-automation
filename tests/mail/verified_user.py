@@ -5,7 +5,6 @@ from __future__ import annotations
 from collections.abc import Callable, Generator
 from typing import Any
 
-import pytest
 import requests
 
 from api.api_manager import ApiManager
@@ -69,8 +68,6 @@ def provision_verified_mail_user(
     retry_handler = on_signup_retry or _default_on_retry
 
     last_response = register_user_with_retries(api_manager, user, on_retry=retry_handler)
-    if last_response.status_code == 503:
-        pytest.skip("signUp unavailable (503) after retries — transient stage overload")
     assert last_response.status_code == 201, "signUp is unavailable (503) after retries"
 
     user["id"] = last_response.json().get("user", {}).get("id")
