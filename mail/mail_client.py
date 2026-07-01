@@ -1,11 +1,14 @@
 import time
 from datetime import datetime, timezone
 
-from imap_tools import MailBox
+from imap_tools import A, MailBox
 
 from mail.exceptions import MessageNotFoundError, VerificationLinkNotFoundError
 from mail.models import MailMessage
 from mail.parsers import extract_password_recovery_link, extract_verification_link
+
+_DEFAULT_IMAP_TIMEOUT_S = 30.0
+_FETCH_LIMIT = 50
 
 
 class MailClient:
@@ -16,25 +19,44 @@ class MailClient:
         password: str,
         folder: str = "INBOX",
         port: int = 993,
+        *,
+        imap_timeout_s: float = _DEFAULT_IMAP_TIMEOUT_S,
     ) -> None:
         self.host = host
         self.email = email
         self.password = password
         self.folder = folder
         self.port = port
+        self.imap_timeout_s = imap_timeout_s
 
-    def get_messages(self) -> list[MailMessage]:
-        messages = []
-
-        with MailBox(self.host, port=self.port).login(
+    def _login_mailbox(self) -> MailBox:
+        return MailBox(self.host, port=self.port, timeout=self.imap_timeout_s).login(
             self.email,
             self.password,
             self.folder,
-        ) as mailbox:
-            for msg in mailbox.fetch():
-                messages.append(MailMessage.from_imap_message(msg))
+        )
 
+    def _fetch_messages(
+        self,
+        *,
+        subject: str | None = None,
+        since: datetime | None = None,
+    ) -> list[MailMessage]:
+        if subject:
+            criteria = A(subject=subject)
+            if since is not None:
+                criteria = A(subject=subject, date_gte=self._normalize_utc(since).date())
+        else:
+            criteria = A(all=True)
+
+        messages: list[MailMessage] = []
+        with self._login_mailbox() as mailbox:
+            for msg in mailbox.fetch(criteria, limit=_FETCH_LIMIT, reverse=True):
+                messages.append(MailMessage.from_imap_message(msg))
         return messages
+
+    def get_messages(self) -> list[MailMessage]:
+        return self._fetch_messages()
 
     @staticmethod
     def _normalize_utc(dt: datetime) -> datetime:
@@ -72,7 +94,7 @@ class MailClient:
         since: datetime | None = None,
         min_date: datetime | None = None,
     ) -> MailMessage:
-        messages = self.get_messages()
+        messages = self._fetch_messages(subject=subject, since=since)
         matched_messages: list[MailMessage] = []
 
         for message in messages:
@@ -147,10 +169,6 @@ class MailClient:
         return recovery_link
 
     def delete_message(self, uid: str) -> None:
-        with MailBox(self.host, port=self.port).login(
-            self.email,
-            self.password,
-            self.folder,
-        ) as mailbox:
+        with self._login_mailbox() as mailbox:
             mailbox.delete([uid])
             mailbox.expunge()

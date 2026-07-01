@@ -9,7 +9,7 @@ from urllib3.util.retry import Retry
 from api.api_manager import ApiManager
 from models.Subscriptions.model_subscription import ModelSubscriptionResponse
 from tests.mail.signup_retry import (
-    login_user_with_retries,
+    authenticate_with_retries,
     register_user_with_retries,
     request_with_integration_retries,
 )
@@ -210,14 +210,7 @@ def verified_subscription_user(api_manager):
 @pytest.fixture
 def logged_in_user(api_manager, registered_user):
     """Авторизация пользователя"""
-    login_data = {
-        "username": registered_user["email"],
-        "password": registered_user["password"],
-    }
-    last_login = login_user_with_retries(api_manager, login_data)
-    assert last_login.status_code == 201, "login is unavailable (503) after retries"
-
-    api_manager.auth_api.authenticate((registered_user["email"], registered_user["password"]))
+    authenticate_with_retries(api_manager, registered_user["email"], registered_user["password"])
 
     return registered_user
 

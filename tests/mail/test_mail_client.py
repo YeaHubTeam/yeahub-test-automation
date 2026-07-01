@@ -37,7 +37,7 @@ def test_find_message_returns_newest_matching_message(monkeypatch):
         ),
     ]
 
-    monkeypatch.setattr(MailClient, "get_messages", lambda self: messages)
+    monkeypatch.setattr(MailClient, "_fetch_messages", lambda self, **kwargs: messages)
 
     client = MailClient(
         host="imap.example.com",
@@ -72,7 +72,7 @@ def test_find_message_raises_when_no_match(monkeypatch):
         ),
     ]
 
-    monkeypatch.setattr(MailClient, "get_messages", lambda self: messages)
+    monkeypatch.setattr(MailClient, "_fetch_messages", lambda self, **kwargs: messages)
 
     client = MailClient(
         host="imap.example.com",
@@ -110,7 +110,10 @@ class FakeMailbox:
 def test_delete_message_calls_delete_and_expunge(monkeypatch):
     fake_mailbox = FakeMailbox()
 
-    monkeypatch.setattr("mail.mail_client.MailBox", lambda host, port=993: fake_mailbox)
+    monkeypatch.setattr(
+        "mail.mail_client.MailBox",
+        lambda host, port=993, timeout=None: fake_mailbox,
+    )
 
     client = MailClient(
         host="imap.example.com",

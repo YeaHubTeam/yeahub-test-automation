@@ -8,7 +8,11 @@ from typing import Any
 import requests
 
 from api.api_manager import ApiManager
-from tests.mail.signup_retry import register_user_with_retries, request_with_integration_retries
+from tests.mail.signup_retry import (
+    authenticate_with_retries,
+    register_user_with_retries,
+    request_with_integration_retries,
+)
 from tests.mail.verification_flow import profile_user_id, verify_api_registered_user_email
 from tests.ui.flows.register_mail_interview_flow import new_plus_tagged_email, require_mail_creds
 from utils.data_generator import DataGenerator
@@ -69,7 +73,7 @@ def provision_verified_mail_user(
     user["id"] = last_response.json().get("user", {}).get("id")
     user["token"] = last_response.json().get("access_token")
     verify_started_at = mail_state["started_at"] if mail_state is not None else started_at
-    api_manager.auth_api.authenticate((user["email"], user["password"]))
+    authenticate_with_retries(api_manager, user["email"], user["password"])
     user_id = profile_user_id(api_manager.auth_api.profile().json())
     verify_api_registered_user_email(
         api_manager,

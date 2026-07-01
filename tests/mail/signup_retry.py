@@ -93,3 +93,17 @@ def login_user_with_retries(
         time.sleep(integration_retry_sleep_seconds(attempt))
     assert last_response is not None
     return last_response
+
+
+def authenticate_with_retries(api_manager: ApiManager, email: str, password: str) -> None:
+    """Login with integration retries and set Bearer on the session (same contract as auth_api.authenticate)."""
+    last_response = login_user_with_retries(
+        api_manager,
+        {"username": email, "password": password},
+    )
+    assert last_response.status_code == 201, "login is unavailable (503) after retries"
+    payload = last_response.json()
+    token = payload.get("accessToken") or payload.get("access_token")
+    if not token:
+        raise KeyError(f"Token is missing in login response. Keys found: {list(payload.keys())}")
+    api_manager.auth_api._update_session_headers(Authorization=f"Bearer {token}")

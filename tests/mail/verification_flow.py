@@ -17,6 +17,20 @@ from constants.constants import BASE_URL
 from mail.exceptions import MessageNotFoundError
 from mail.mail_client import MailClient
 from resources.mail_creds import MailCreds
+from tests.mail.signup_retry import (
+    INTEGRATION_MAX_ATTEMPTS,
+    LOGIN_MAX_ATTEMPTS,
+    authenticate_with_retries,
+    integration_retry_sleep_seconds,
+)
+
+_VERIFY_EMAIL_SUCCESS = {200, 302}
+_VERIFY_EMAIL_TIMEOUT = (15, 30)
+_TRANSIENT_VERIFY_ERRORS = (
+    requests.exceptions.ConnectionError,
+    requests.exceptions.ChunkedEncodingError,
+    requests.exceptions.ReadTimeout,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -150,12 +164,28 @@ def confirm_email_via_link(verification_url: str) -> None:
     token = (parse_qs(parsed.query).get("token") or [None])[0]
     assert token, "verification token is missing in link"
     base = BASE_URL.rstrip("/")
-    verify_resp = requests.get(
-        f"{base}/auth/verify-email",
-        params={"token": token},
-        timeout=15,
-    )
-    assert verify_resp.status_code in {200, 302}
+    verify_url = f"{base}/auth/verify-email"
+    last_response: requests.Response | None = None
+    for attempt in range(INTEGRATION_MAX_ATTEMPTS):
+        try:
+            last_response = requests.get(
+                verify_url,
+                params={"token": token},
+                timeout=_VERIFY_EMAIL_TIMEOUT,
+            )
+        except _TRANSIENT_VERIFY_ERRORS as exc:
+            if attempt == INTEGRATION_MAX_ATTEMPTS - 1:
+                raise exc
+            time.sleep(integration_retry_sleep_seconds(attempt))
+            continue
+        if last_response.status_code in _VERIFY_EMAIL_SUCCESS:
+            return
+        if last_response.status_code == 503:
+            time.sleep(integration_retry_sleep_seconds(attempt))
+            continue
+        assert last_response.status_code in _VERIFY_EMAIL_SUCCESS
+    assert last_response is not None
+    assert last_response.status_code in _VERIFY_EMAIL_SUCCESS
 
 
 def profile_user_id(profile: dict) -> str:
@@ -174,7 +204,7 @@ def profile_is_verified(profile: dict) -> bool:
 
 
 def assert_profile_verified(api_manager: ApiManager, email: str, password: str) -> None:
-    api_manager.auth_api.authenticate((email, password))
+    authenticate_with_retries(api_manager, email, password)
     profile = api_manager.auth_api.profile().json()
     assert profile_is_verified(profile), "User email is not verified after verification link"
 
@@ -190,7 +220,7 @@ def wait_until_profile_verified(
     """Ждём isVerified=true после verify во второй вкладке (SPA/API eventual consistency)."""
     deadline = time.time() + timeout_s
     while time.time() < deadline:
-        api_manager.auth_api.authenticate((email, password))
+        authenticate_with_retries(api_manager, email, password)
         profile = api_manager.auth_api.profile().json()
         if profile_is_verified(profile):
             return
@@ -245,7 +275,7 @@ def verify_api_registered_user_email(
 
 
 def assert_profile_not_verified(api_manager: ApiManager, email: str, password: str) -> None:
-    api_manager.auth_api.authenticate((email, password))
+    authenticate_with_retries(api_manager, email, password)
     profile = api_manager.auth_api.profile().json()
     assert not profile_is_verified(profile), (
         "Expected isVerified=false before opening verification link"
@@ -256,7 +286,7 @@ def assert_profile_specialization_selected(
     api_manager: ApiManager, email: str, password: str
 ) -> None:
     """После онбординга в профиле должна быть выбранная специализация (specializationId != 0)."""
-    api_manager.auth_api.authenticate((email, password))
+    authenticate_with_retries(api_manager, email, password)
     profile = api_manager.auth_api.profile().json()
     profiles = profile.get("profiles") or []
     assert profiles, "profiles missing in /auth/profile"
@@ -272,7 +302,7 @@ def authenticate_for_teardown(
     email: str,
     password: str,
     *,
-    max_attempts: int = 3,
+    max_attempts: int = LOGIN_MAX_ATTEMPTS,
 ) -> TeardownAuthResult:
     """Login для teardown: отделяем неверный пароль от 503/сети (не путать с ValueError от authenticate)."""
     for attempt in range(max_attempts):
@@ -287,7 +317,7 @@ def authenticate_for_teardown(
         ) as exc:
             if attempt == max_attempts - 1:
                 raise exc
-            time.sleep(1.5 * (attempt + 1))
+            time.sleep(integration_retry_sleep_seconds(attempt))
             continue
 
         if resp.status_code == 201:
@@ -304,7 +334,7 @@ def authenticate_for_teardown(
         if resp.status_code == 503:
             if attempt == max_attempts - 1:
                 return "transient_failed"
-            time.sleep(1.5 * (attempt + 1))
+            time.sleep(integration_retry_sleep_seconds(attempt))
             continue
         raise ValueError(
             f"Unexpected teardown login status {resp.status_code}: {resp.text[:300]!r}"
