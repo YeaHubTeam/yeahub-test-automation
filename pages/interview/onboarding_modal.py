@@ -126,36 +126,68 @@ class OnboardingModal:
     def _specialization_dropdown(self):
         return self.modal.get_by_test_id("dropdown-select")
 
+    def _specialization_listbox(self):
+        """Список рендерится в portaled listbox вне modal — не матчим скрытые option по всей странице."""
+        return self.page.get_by_role("listbox").last
+
+    def _specialization_options(self):
+        listbox = self._specialization_listbox()
+        if listbox.count() and listbox.is_visible(timeout=300):
+            return listbox.get_by_role("option")
+        return self.page.get_by_role("option")
+
     def _is_specialization_dropdown_open(self) -> bool:
         expanded = self._specialization_dropdown().get_attribute("aria-expanded")
-        return expanded == "true"
+        if expanded == "true":
+            return True
+        listbox = self._specialization_listbox()
+        return listbox.count() > 0 and listbox.is_visible(timeout=200)
+
+    def _expect_specialization_listbox_open(self, *, timeout_ms: int = 15_000) -> None:
+        expect(self._specialization_listbox()).to_be_visible(timeout=timeout_ms)
+        expect(self._specialization_options().first).to_be_visible(timeout=timeout_ms)
 
     def open_specialization_dropdown(self) -> None:
-        """`dropdown-select` — кнопка-toggle; один click открывает, второй закрывает список."""
+        """`dropdown-select` — toggle; повторный click только если список ещё закрыт."""
         dropdown = self._specialization_dropdown()
         expect(dropdown).to_be_visible(timeout=15_000)
-        if self.page.get_by_role("option").first.is_visible(timeout=500):
+        dropdown.scroll_into_view_if_needed(timeout=5_000)
+        if self._is_specialization_dropdown_open():
+            self._expect_specialization_listbox_open(timeout_ms=5_000)
             return
 
         dropdown.click(timeout=10_000)
-        if self.page.get_by_role("option").first.is_visible(timeout=3_000):
+        try:
+            self._expect_specialization_listbox_open(timeout_ms=8_000)
             return
+        except AssertionError:
+            pass
 
-        # Список не открылся или toggle закрыл — повторный click.
-        dropdown.click(timeout=10_000)
-        expect(self.page.get_by_role("option").first).to_be_visible(timeout=15_000)
+        if not self._is_specialization_dropdown_open():
+            dropdown.click(timeout=10_000)
+            try:
+                self._expect_specialization_listbox_open(timeout_ms=8_000)
+                return
+            except AssertionError:
+                pass
+
+        dropdown.focus()
+        self.page.keyboard.press("ArrowDown")
+        self._expect_specialization_listbox_open(timeout_ms=15_000)
 
     def expect_specialization_list_visible(self) -> None:
         if self._is_specialization_dropdown_open():
-            expect(self.page.get_by_role("option").first).to_be_visible(timeout=5_000)
+            self._expect_specialization_listbox_open(timeout_ms=5_000)
             return
         self.open_specialization_dropdown()
 
     def choose_reference_specialization(self) -> None:
-        """Эталон: React Frontend Developer — список role=option после click на dropdown-select."""
-        if not self.page.get_by_role("option").first.is_visible(timeout=1_000):
+        """Эталон: React Frontend Developer — option внутри listbox после click на dropdown-select."""
+        if not self._is_specialization_dropdown_open():
             self.open_specialization_dropdown()
-        option = self.page.get_by_role("option", name=REFERENCE_SPECIALIZATION_TITLE_PATTERN)
+        option = self._specialization_options().filter(
+            has_text=REFERENCE_SPECIALIZATION_TITLE_PATTERN
+        )
         expect(option.first).to_be_visible(timeout=15_000)
         option.first.click()
         expect(self._specialization_dropdown()).to_contain_text(
