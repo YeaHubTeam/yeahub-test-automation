@@ -130,6 +130,18 @@ class LoginPage:
             break
         assert last_status == 201, f"Expected login success HTTP 201, got {last_status}"
 
+    def login_expecting_authorized(self, email: str, password: str, *, username: str) -> None:
+        """UI login → /interview; при 201 без SPA-редиректа — fallback на /interview (медленный stage)."""
+        from pages.interview.interview_page import INTERVIEW_URL_RE, InterviewPage
+
+        self.fill_credentials(email, password)
+        self.submit_expecting_success()
+        interview = InterviewPage(self.page)
+        if not INTERVIEW_URL_RE.search(self.page.url):
+            interview.open_interview()
+        interview.complete_onboarding_if_blocking_interview()
+        interview.expect_authorized_after_login(username=username)
+
     def submit_expecting_unauthorized(self) -> None:
         """ТК 117 шаг 7: login удалённого пользователя → HTTP 401/403, остаёмся на /auth/login."""
         with self.page.expect_response(

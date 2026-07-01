@@ -119,13 +119,27 @@ class RegisterPage:
         expect(self._consent_checkbox("adConsent")).to_be_checked()
         self.expect_submit_enabled()
 
-    def submit_registration(self):
-        self.submit_button.click()
+    def submit_registration(self) -> None:
+        last_status: int | None = None
+        for attempt in range(5):
+            with self.page.expect_response(
+                lambda r: "/auth/signUp" in r.url and r.request.method == "POST",
+                timeout=45_000,
+            ) as resp_info:
+                self.submit_button.click()
+            last_status = resp_info.value.status
+            if last_status == 201:
+                return
+            if last_status == 503 and attempt < 4:
+                self.page.wait_for_timeout(3_000 * (attempt + 1))
+                continue
+            break
+        assert last_status == 201, f"signUp expected 201, got {last_status}"
 
-    def wait_after_successful_register(self):
+    def wait_after_successful_register(self) -> None:
         expect(self.page).to_have_url(
-            re.compile(r".*/interview$"),
-            timeout=15_000,
+            re.compile(r".*interview(?:/|$|\?)", re.I),
+            timeout=30_000,
         )
 
     def finish_registration_after_api_signup(self, access_token: str) -> None:

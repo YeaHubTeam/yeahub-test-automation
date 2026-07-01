@@ -44,9 +44,7 @@ def test_change_password_settings_desktop(page: Page, registered_user: dict[str,
     with allure.step("Предусловие: UI-вход в личный кабинет"):
         login_page = LoginPage(page)
         login_page.open()
-        login_page.fill_credentials(email, current_password)
-        login_page.submit()
-        InterviewPage(page).expect_authorized_after_login(username=username)
+        login_page.login_expecting_authorized(email, current_password, username=username)
 
     change_password_page = ChangePasswordPage(page)
 
@@ -76,8 +74,4 @@ def test_change_password_settings_desktop(page: Page, registered_user: dict[str,
         login_page.clear_browser_session()
         login_page.ensure_on_login_page()
         login_page.expect_login_form_elements_visible()
-        login_page.fill_credentials(email, new_password)
-        login_page.submit_expecting_success()
-        interview_page = InterviewPage(page)
-        interview_page.complete_onboarding_if_blocking_interview()
-        interview_page.expect_authorized_after_login(username=username)
+        login_page.login_expecting_authorized(email, new_password, username=username)

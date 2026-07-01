@@ -1,6 +1,7 @@
 import re
 
 from playwright.sync_api import Page, expect
+from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 
 from pages.interview.onboarding_modal import OnboardingModal
 
@@ -128,10 +129,22 @@ class ChangePasswordPage:
         expect(self._save_button()).to_be_disabled(timeout=10_000)
 
     def click_save(self) -> None:
-        self._dismiss_onboarding_if_visible()
         save_btn = self._save_button()
-        expect(save_btn).to_be_enabled(timeout=10_000)
-        save_btn.click(timeout=15_000)
+        expect(save_btn).to_be_enabled(timeout=15_000)
+        last_error: Exception | None = None
+        for _ in range(5):
+            self._dismiss_onboarding_if_visible()
+            self._wait_until_form_ready(max_attempts=3)
+            save_btn = self._save_button()
+            save_btn.scroll_into_view_if_needed()
+            try:
+                save_btn.click(timeout=25_000)
+                return
+            except PlaywrightTimeoutError as exc:
+                last_error = exc
+                self.page.wait_for_timeout(800)
+        assert last_error is not None
+        raise last_error
 
     def expect_success_notification(self) -> None:
         expect(
