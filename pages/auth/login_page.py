@@ -139,7 +139,6 @@ class LoginPage:
         interview = InterviewPage(self.page)
         if not INTERVIEW_URL_RE.search(self.page.url):
             interview.open_interview()
-        interview.complete_onboarding_if_blocking_interview()
         interview.expect_authorized_after_login(username=username, email=email)
 
     def submit_expecting_unauthorized(self) -> None:

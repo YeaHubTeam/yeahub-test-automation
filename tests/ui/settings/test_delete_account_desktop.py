@@ -12,7 +12,7 @@ from playwright.sync_api import Page
 
 from pages.auth.login_page import LoginPage
 from pages.auth.register_page import RegisterPage
-from pages.interview.interview_page import INTERVIEW_URL_RE, InterviewPage
+from pages.interview.interview_page import InterviewPage
 from pages.settings.settings_page import SettingsPage
 from utils.reporting import report_step
 
@@ -56,12 +56,7 @@ def test_delete_account_from_settings_desktop(page: Page, registered_user: dict[
         "Вкладка «Аккаунт», блок «Удаление аккаунта» с кнопкой «Удалить аккаунт»",
     ):
         login_page.open()
-        login_page.fill_credentials(email, password)
-        login_page.submit_expecting_success()
-        if not INTERVIEW_URL_RE.search(page.url):
-            interview_page.open_interview()
-        interview_page.expect_authorized_after_login(username=username, email=email)
-        interview_page.prepare_interview_after_login()
+        login_page.login_expecting_authorized(email, password, username=username)
         interview_page.ensure_onboarding_completed_before_settings()
         settings_page.open_account_ready()
         settings_page.expect_delete_account_section_visible()

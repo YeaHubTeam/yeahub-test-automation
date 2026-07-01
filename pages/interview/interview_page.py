@@ -22,15 +22,39 @@ class InterviewPage:
         expect(self.page).to_have_url(INTERVIEW_URL_RE)
 
     def expect_authorized_after_login(self, *, username: str, email: str | None = None) -> None:
-        """Шаг 4 ТК 409: редирект на interview и признак активной сессии (имя или email в шапке)."""
+        """Шаг 4 ТК 409: /interview + активная сессия (имя/email в шапке или аватар-меню)."""
         expect(self.page).to_have_url(INTERVIEW_URL_RE, timeout=20_000)
         expect(self.page).not_to_have_url(re.compile(r".*/auth/login", re.I), timeout=10_000)
-        identity = self.page.get_by_text(username).first
-        if identity.is_visible(timeout=8_000):
-            return
-        if email and self.page.get_by_text(email).first.is_visible(timeout=8_000):
-            return
-        expect(identity).to_be_visible(timeout=12_000)
+        self.complete_onboarding_if_blocking_interview()
+        self._expect_session_identity_visible(username=username, email=email)
+
+    def _header_profile_trigger(self):
+        header = self.page.locator("header")
+        by_avatar = header.locator('button[aria-haspopup="dialog"]').filter(
+            has=self.page.get_by_test_id("AvatarWithoutPhoto_Wrapper")
+        )
+        if by_avatar.count():
+            return by_avatar.first
+        return header.locator('button[aria-haspopup="dialog"]').last
+
+    def _expect_session_identity_visible(self, *, username: str, email: str | None = None) -> None:
+        """На stage в шапке часто нет полного ФИО — ищем фрагменты в header, затем аватар-меню."""
+        header = self.page.locator("header")
+        candidates: list[str] = [username]
+        if email:
+            candidates.append(email)
+            local = email.split("@", 1)[0]
+            if local:
+                candidates.append(local)
+        first_name = username.split(maxsplit=1)[0] if username.split() else ""
+        if first_name and first_name not in candidates:
+            candidates.append(first_name)
+
+        for text in candidates:
+            if header.get_by_text(text, exact=False).first.is_visible(timeout=3_000):
+                return
+
+        expect(self._header_profile_trigger()).to_be_visible(timeout=15_000)
 
     def open_interview(self) -> None:
         self.page.goto("/interview", wait_until="domcontentloaded", timeout=60_000)
