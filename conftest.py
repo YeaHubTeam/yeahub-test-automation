@@ -1,5 +1,4 @@
-import time
-from datetime import datetime, timezone
+from typing import Any
 
 import pytest
 import requests
@@ -8,19 +7,20 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
 from api.api_manager import ApiManager
-from models.auth_model import AuthModel
 from models.Subscriptions.model_subscription import ModelSubscriptionResponse
-from resources.user_creds import VerifiedUserCreds
+from tests.mail.signup_retry import (
+    authenticate_with_retries,
+    register_user_with_retries,
+    request_with_integration_retries,
+)
 from tests.mail.verification_flow import (
     assert_profile_not_verified,
     authenticate_for_teardown,
-    profile_user_id,
-    verify_api_registered_user_email,
 )
+from tests.mail.verified_user import provision_verified_mail_user, yield_payment_link_subscriptions
 from tests.ui.flows.register_mail_interview_flow import new_plus_tagged_email, require_mail_creds
 from utils.data_generator import DataGenerator
 from utils.helpers import DataUtils
-from utils.subscription_cleanup import delete_user_premium_subscription_if_present
 
 load_dotenv()
 
@@ -105,20 +105,12 @@ def test_user():
 @pytest.fixture
 def registered_user(api_manager, test_user):
     """Регистрация пользователя и удаление его после теста"""
-    # signUp иногда отвечает 503 от nginx; для устойчивости делаем короткие ретраи.
-    # Важно: на каждом ретрае меняем email/username, чтобы не упираться в 409 duplicate.
-    last_response = None
-    for attempt in range(5):
-        last_response = api_manager.auth_api.register_user(
-            test_user, expected_status=[201, 503, 409]
-        )
-        if last_response.status_code == 201:
-            break
+
+    def _refresh_identity(_attempt: int, _response) -> None:
         test_user["email"] = DataGenerator.random_email()
         test_user["username"] = DataGenerator.random_username()
-        time.sleep(2 * (attempt + 1))
 
-    assert last_response is not None
+    last_response = register_user_with_retries(api_manager, test_user, on_retry=_refresh_identity)
     assert last_response.status_code == 201, "signUp is unavailable (503) after retries"
 
     test_user["id"] = last_response.json().get("user", {}).get("id")
@@ -137,29 +129,28 @@ def registered_user(api_manager, test_user):
 def unverified_mail_registered_user(api_manager, test_user):
     """API signUp на MAIL_EMAIL+tag, isVerified=false. Для UI ТК 422 (IMAP verify)."""
     require_mail_creds()
-    _started_at, _tag, recipient_email, password, username = new_plus_tagged_email()
+    mail_identity = {"started_at": None}
+    started_at, _tag, recipient_email, password, username = new_plus_tagged_email()
+    mail_identity["started_at"] = started_at
     test_user["email"] = recipient_email
     test_user["password"] = password
     test_user["username"] = username
-    last_response = None
-    for attempt in range(5):
-        last_response = api_manager.auth_api.register_user(
-            test_user, expected_status=[201, 503, 409]
-        )
-        if last_response.status_code == 201:
-            break
-        _started_at, _tag, recipient_email, password, username = new_plus_tagged_email()
-        test_user["email"] = recipient_email
-        test_user["password"] = password
-        test_user["username"] = username
-        time.sleep(2 * (attempt + 1))
 
-    assert last_response is not None
+    def _refresh_mail_identity(_attempt: int, _response) -> None:
+        new_started_at, _new_tag, new_email, new_password, new_username = new_plus_tagged_email()
+        mail_identity["started_at"] = new_started_at
+        test_user["email"] = new_email
+        test_user["password"] = new_password
+        test_user["username"] = new_username
+
+    last_response = register_user_with_retries(
+        api_manager, test_user, on_retry=_refresh_mail_identity
+    )
     assert last_response.status_code == 201, "signUp is unavailable (503) after retries"
 
     test_user["id"] = last_response.json().get("user", {}).get("id")
     test_user["token"] = last_response.json().get("access_token")
-    test_user["mail_since"] = _started_at
+    test_user["mail_since"] = mail_identity["started_at"]
     assert_profile_not_verified(api_manager, test_user["email"], test_user["password"])
     yield test_user
     _delete_user_try_passwords(
@@ -177,37 +168,20 @@ def verified_registered_user(api_manager, test_user):
 
     Email — `local+tag@domain` на MAIL_EMAIL (иначе IMAP не найдёт письмо верификации).
     """
-    require_mail_creds()
-    started_at, _tag, recipient_email, password, username = new_plus_tagged_email()
-    test_user["email"] = recipient_email
-    test_user["password"] = password
-    test_user["username"] = username
-    last_response = None
-    for attempt in range(5):
-        last_response = api_manager.auth_api.register_user(
-            test_user, expected_status=[201, 503, 409]
-        )
-        if last_response.status_code == 201:
-            break
-        started_at, _tag, recipient_email, password, username = new_plus_tagged_email()
-        test_user["email"] = recipient_email
-        test_user["password"] = password
-        test_user["username"] = username
-        time.sleep(2 * (attempt + 1))
+    mail_identity: dict[str, Any] = {"started_at": None}
 
-    assert last_response is not None
-    assert last_response.status_code == 201, "signUp is unavailable (503) after retries"
+    def _refresh_mail_identity(_attempt: int, _response) -> None:
+        new_started_at, _new_tag, new_email, new_password, new_username = new_plus_tagged_email()
+        mail_identity["started_at"] = new_started_at
+        test_user["email"] = new_email
+        test_user["password"] = new_password
+        test_user["username"] = new_username
 
-    test_user["id"] = last_response.json().get("user", {}).get("id")
-    test_user["token"] = last_response.json().get("access_token")
-    api_manager.auth_api.authenticate((test_user["email"], test_user["password"]))
-    user_id = profile_user_id(api_manager.auth_api.profile().json())
-    verify_api_registered_user_email(
+    provision_verified_mail_user(
         api_manager,
-        email=test_user["email"],
-        password=test_user["password"],
-        user_id=user_id,
-        started_at=started_at,
+        user_payload=test_user,
+        mail_state=mail_identity,
+        on_signup_retry=_refresh_mail_identity,
     )
     yield test_user
     _delete_user_try_passwords(
@@ -219,61 +193,33 @@ def verified_registered_user(api_manager, test_user):
     )
 
 
+@pytest.fixture(scope="module")
+def verified_subscription_user(api_manager):
+    """Verified user per API subscription module (signUp → IMAP verify → delete)."""
+    user = provision_verified_mail_user(api_manager)
+    yield user
+    _delete_user_try_passwords(
+        api_manager,
+        email=user["email"],
+        user_id=user.get("id"),
+        password=user["password"],
+        active_password=user.get("active_password"),
+    )
+
+
 @pytest.fixture
 def logged_in_user(api_manager, registered_user):
     """Авторизация пользователя"""
-    login_data = {
-        "username": registered_user["email"],
-        "password": registered_user["password"],
-    }
-    last_login = None
-    for attempt in range(5):
-        last_login = api_manager.auth_api.login_user(login_data, expected_status=[201, 503])
-        if last_login.status_code == 201:
-            break
-        time.sleep(2 * (attempt + 1))
-    assert last_login is not None
-    assert last_login.status_code == 201, "login is unavailable (503) after retries"
-
-    api_manager.auth_api.authenticate((registered_user["email"], registered_user["password"]))
+    authenticate_with_retries(api_manager, registered_user["email"], registered_user["password"])
 
     return registered_user
 
 
-@pytest.fixture(scope="package")
-def static_user(api_manager):
-    # TODO static_user является захардкоженным пользователем с уже подтвержденным email.
-    # TODO изменить эту фикстуру или переделать другую, когда будет сделан почтовый клиент.
-    login_data = {
-        "username": VerifiedUserCreds.EMAIL,
-        "password": VerifiedUserCreds.PASSWORD,
-    }
-    last_login = None
-    for attempt in range(5):
-        last_login = api_manager.auth_api.login_user(login_data, expected_status=[201, 503])
-        if last_login.status_code == 201:
-            break
-        time.sleep(2 * (attempt + 1))
-    assert last_login is not None
-    assert last_login.status_code == 201, "static user login is unavailable (503) after retries"
-
-    data_user = last_login.json()
-    api_manager.auth_api.authenticate((VerifiedUserCreds.EMAIL, VerifiedUserCreds.PASSWORD))
-    validate_user = AuthModel.model_validate(data_user)
-    yield validate_user.user
-    api_manager.auth_api.logout(expected_status=[200, 401, 503])
-
-
 @pytest.fixture(scope="session")
 def get_list_subscriptions(api_manager):
-    last_response = None
-    for attempt in range(5):
-        last_response = api_manager.subscriptions_api.get_subscriptions(expected_status=[200, 503])
-        if last_response.status_code == 200:
-            break
-        time.sleep(2 * (attempt + 1))
-
-    assert last_response is not None
+    last_response = request_with_integration_retries(
+        lambda: api_manager.subscriptions_api.get_subscriptions(expected_status=[200, 503]),
+    )
     assert last_response.status_code == 200, "subscriptions list is unavailable (503) after retries"
 
     response_json = last_response.json()
@@ -281,34 +227,10 @@ def get_list_subscriptions(api_manager):
 
 
 @pytest.fixture(scope="function")
-def payment_link_subscriptions(api_manager, static_user, get_list_subscriptions):
-    """Создает ссылку на оплату подписки."""
-    delete_user_premium_subscription_if_present(
-        api_manager, user_id=static_user.id, subscriptions_catalog=get_list_subscriptions
-    )
-    id_subscriptions = DataUtils.find_item(
-        items=get_list_subscriptions,
-        condition=lambda sub: sub.name == "Премиум на 3 месяца",
-        transform=lambda sub: sub.id,
-    )
-
-    # payment/init иногда отвечает 503 от nginx; для устойчивости делаем короткие ретраи
-    last_response = None
-    for attempt in range(5):
-        last_response = api_manager.subscriptions_api.subscriptions_payment_pending(
-            id_subscriptions,
-            static_user.email,
-            expected_status=[200, 503],
-        )
-        if last_response.status_code == 200:
-            break
-        time.sleep(2 * (attempt + 1))
-
-    assert last_response is not None
-    assert last_response.status_code == 200, "payment/init is unavailable (503) after retries"
-
-    payment_url = last_response.text
-    yield payment_url
-    delete_user_premium_subscription_if_present(
-        api_manager, user_id=static_user.id, subscriptions_catalog=get_list_subscriptions
+def payment_link_subscriptions(api_manager, verified_subscription_user, get_list_subscriptions):
+    """Создает ссылку на оплату подписки (API tests: module-scoped verified user)."""
+    yield from yield_payment_link_subscriptions(
+        api_manager,
+        user=verified_subscription_user,
+        subscriptions_catalog=get_list_subscriptions,
     )

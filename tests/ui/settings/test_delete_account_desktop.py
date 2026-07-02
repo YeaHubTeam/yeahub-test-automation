@@ -56,10 +56,7 @@ def test_delete_account_from_settings_desktop(page: Page, registered_user: dict[
         "Вкладка «Аккаунт», блок «Удаление аккаунта» с кнопкой «Удалить аккаунт»",
     ):
         login_page.open()
-        login_page.fill_credentials(email, password)
-        login_page.submit()
-        interview_page.expect_authorized_after_login(username=username)
-        interview_page.prepare_interview_after_login()
+        login_page.login_expecting_authorized(email, password, username=username)
         interview_page.ensure_onboarding_completed_before_settings()
         settings_page.open_account_ready()
         settings_page.expect_delete_account_section_visible()

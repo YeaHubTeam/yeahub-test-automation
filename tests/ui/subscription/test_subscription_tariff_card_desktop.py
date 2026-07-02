@@ -4,7 +4,7 @@ https://team-vz1y.testit.software/browse/116
 
 Полный путь: settings#select-tariff → модалка → T-Bank → активная подписка на stage.
 Пользователь: API signUp + IMAP verify (`verified_registered_user`), teardown — delete user.
-Отдельно от `test_subscription_payment_ui.py` (оплата по ссылке из API, `static_user`).
+Отдельно от `test_subscription_payment_ui.py` (оплата по API-ссылке, `verified_registered_user`).
 """
 
 import os

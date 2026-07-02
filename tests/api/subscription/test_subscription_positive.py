@@ -18,6 +18,9 @@ from utils.helpers import DataUtils
 
 pytestmark = [pytest.mark.api, pytest.mark.integration, pytest.mark.regression]
 
+# Prerequisites: verified_subscription_user / payment_link_subscriptions need MAIL_* (IMAP verify).
+# See README — «API integration: подписки». Without MAIL_* → SKIPPED via require_mail_creds().
+
 
 @pytest.mark.api
 @allure.label("AQA_Engineer", "Nikolay Martoplyas")
@@ -45,7 +48,7 @@ class TestSubscriptionPositive:
             )
 
     @allure.title("Проверка данных для оплаты")
-    def test_payment_details(self, payment_link_subscriptions, static_user):
+    def test_payment_details(self, payment_link_subscriptions, verified_subscription_user):
         with allure.step("Берем финальную цену подписки из документации в копейках"):
             price_tarif = DataUtils.find_item(
                 items=TarifList.base_tarif().tarifs,
@@ -93,20 +96,24 @@ class TestSubscriptionPositive:
                 "Описание не совпадает",
             )
             customer = payment_data.get("customer") or {}
-            check.equal(customer.get("key"), static_user.id, "ID заказчика не совпадают")
+            check.equal(
+                customer.get("key"), verified_subscription_user["id"], "ID заказчика не совпадают"
+            )
             check.equal(
                 customer.get("email"),
-                static_user.email,
+                verified_subscription_user["email"],
                 "Email заказчика не совпадают",
             )
             assert datetime.datetime.fromisoformat(status.get("timestamp")), "Неверный формат даты"
 
     @allure.title("Проверка статуса подписки после создания оплаты")
     def test_status_subscription_after_payment(
-        self, payment_link_subscriptions, api_manager, static_user
+        self, payment_link_subscriptions, api_manager, verified_subscription_user
     ):
         with allure.step("Извлекаем конкретную подписку у пользователя"):
-            response = api_manager.subscriptions_api.get_subscriptions_users(static_user.id).json()
+            response = api_manager.subscriptions_api.get_subscriptions_users(
+                verified_subscription_user["id"]
+            ).json()
 
         with allure.step("Валидируем данные через пудантик"):
             validate_response = DataUtils.type_adapter(List[UserSubscriptionResponse], response)
@@ -123,9 +130,13 @@ class TestSubscriptionPositive:
 
     @pytest.mark.smoke
     @allure.title("Удаление подписки ")
-    def test_delete_subscription(self, static_user, api_manager, payment_link_subscriptions):
+    def test_delete_subscription(
+        self, verified_subscription_user, api_manager, payment_link_subscriptions
+    ):
         with allure.step("Получаем список подписок у пользователя"):
-            response = api_manager.subscriptions_api.get_subscriptions_users(static_user.id).json()
+            response = api_manager.subscriptions_api.get_subscriptions_users(
+                verified_subscription_user["id"]
+            ).json()
 
         with allure.step("Валидируем данные через пудантик"):
             validate_response = DataUtils.type_adapter(List[UserSubscriptionResponse], response)
@@ -139,14 +150,14 @@ class TestSubscriptionPositive:
         with allure.step("Удаление подписки "):
             request_body = {
                 "subscriptionId": user_subscription.subscription_id,
-                "userId": static_user.id,
+                "userId": verified_subscription_user["id"],
                 "orderId": user_subscription.id,
             }
             api_manager.subscriptions_api.delete_subscriptions(request_body)
 
         with allure.step("Получаем обновленный список подписок после удаления"):
             updated_subscriptions = api_manager.subscriptions_api.get_subscriptions_users(
-                static_user.id
+                verified_subscription_user["id"]
             ).json()
 
         with allure.step("Валидируем Обновленные данные через пудантик"):
@@ -166,7 +177,9 @@ class TestSubscriptionPositive:
 
     @pytest.mark.smoke
     @allure.title("Создание заказа на оплату с бесплатной подпиской")
-    def test_free_subscription(self, api_manager, static_user, get_list_subscriptions):
+    def test_free_subscription(
+        self, api_manager, verified_subscription_user, get_list_subscriptions
+    ):
         with allure.step("Получаем ID бесплатной подписки"):
             subscription_id = DataUtils.find_item(
                 items=get_list_subscriptions,
@@ -190,7 +203,11 @@ class TestSubscriptionPositive:
 
     @allure.title("Повторный запрос на оплату подписки")
     def test_retry_subscription_payment(
-        self, static_user, api_manager, get_list_subscriptions, payment_link_subscriptions
+        self,
+        verified_subscription_user,
+        api_manager,
+        get_list_subscriptions,
+        payment_link_subscriptions,
     ):
         with allure.step("Получаем ID подписки"):
             subscription_id = DataUtils.find_item(
@@ -200,7 +217,7 @@ class TestSubscriptionPositive:
             )
         with allure.step("Делаем повторный запрос на создание ссылки на оплату"):
             response = api_manager.subscriptions_api.subscriptions_payment_pending(
-                subscription_id, static_user.email
+                subscription_id, verified_subscription_user["email"]
             ).text
 
         with allure.step("Assert"):

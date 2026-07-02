@@ -22,16 +22,9 @@ from pages.auth.login_page import LoginPage
 from pages.auth.password_recovery_page import PasswordRecoveryPage
 from pages.interview.interview_page import InterviewPage
 from pages.interview.onboarding_modal import OnboardingModal
-from resources.mail_creds import MailCreds
 from tests.mail.reset_password_flow import wait_imap_reset_password_link_after_ui_send
 from tests.ui.flows.register_mail_interview_flow import require_mail_creds
 from utils.data_generator import DataGenerator
-
-
-def _require_mail_integration() -> None:
-    assert MailCreds.EMAIL and MailCreds.PASSWORD and MailCreds.HOST, (
-        "Mail creds are not configured. Set MAIL_HOST/MAIL_EMAIL/MAIL_PASSWORD."
-    )
 
 
 @pytest.mark.ui
@@ -57,7 +50,6 @@ def test_forgot_password_recovery_desktop(
     verified_registered_user: dict[str, Any],
 ):
     """Восстановление пароля через письмо (desktop)."""
-    _require_mail_integration()
     require_mail_creds()
 
     email = verified_registered_user["email"]

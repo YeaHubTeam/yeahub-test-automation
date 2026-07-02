@@ -7,7 +7,7 @@ https://team-vz1y.testit.software/browse/422
 """
 
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import allure
@@ -23,6 +23,7 @@ from tests.mail.verification_flow import (
     assert_profile_not_verified,
     assert_profile_verified,
     wait_imap_verification_link_or_resend,
+    wait_until_profile_verified,
 )
 from tests.ui.flows.email_verify_flow import open_verification_link_in_new_tab
 from tests.ui.flows.register_mail_interview_flow import require_mail_creds
@@ -115,6 +116,7 @@ def test_email_verify_registered_user_desktop(
         "Шаг 3: нажать «Подтвердить» справа от поля email",
         "Клик по кнопке; при успехе — тост; при ошибке/rate limit после signUp — письмо ищем в IMAP",
     ):
+        step3_at = datetime.now(timezone.utc)
         ui_sent_ok = email_verify_page.click_confirm_send_email()
         if ui_sent_ok:
             email_verify_page.expect_after_resend_click()
@@ -123,11 +125,14 @@ def test_email_verify_registered_user_desktop(
         "Шаг 4: открыть в ящике письмо YeaHub с темой Verify Your Email",
         "Письмо от signUp/шага 3 или повторная отправка через API при отсутствии в IMAP",
     ):
+        # После resend на шаге 3 backend принимает только токен из последнего письма.
+        imap_min_date = (step3_at - timedelta(seconds=5)) if ui_sent_ok else None
         verification_url = wait_imap_verification_link_or_resend(
             api_manager,
             user_id=user_id,
             recipient_email=email,
             since=mail_since,
+            min_date=imap_min_date,
             imap_first_timeout_s=90.0,
             imap_after_resend_timeout_s=180.0,
         )
@@ -142,6 +147,6 @@ def test_email_verify_registered_user_desktop(
         "Шаг 6: открыть /settings#email-verify",
         "Отображается надпись «Почта успешно подтверждена»",
     ):
-        email_verify_page.open_email_verify_direct()
+        wait_until_profile_verified(api_manager, email, password)
         email_verify_page.expect_email_verified_state()
         assert_profile_verified(api_manager, email, password)

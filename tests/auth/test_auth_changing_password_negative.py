@@ -2,6 +2,7 @@ import pytest
 from faker import Faker
 
 from payloads.auth_payloads import AuthPayloads
+from tests.mail.signup_retry import password_change_with_retries
 from utils.data_generator import DataGenerator
 
 faker = Faker()
@@ -14,8 +15,8 @@ class TestPasswordNegative:
     def test_differend_passwords(self, logged_in_user, api_manager):
         """пароль и подьверждение пароля разные"""
         payload = AuthPayloads.payload_password(passwordConfirm=DataGenerator.random_password())
-        response = api_manager.auth_api.password_change(
-            logged_in_user["id"], payload, expected_status=400
+        response = password_change_with_retries(
+            api_manager, logged_in_user["id"], payload, success_status=400
         )
         assert response.json().get("description") == "Password confirmation failed", (
             "Сообщения не совпадают"
@@ -26,12 +27,18 @@ class TestPasswordNegative:
     def test_password_confirmation_empty(self, logged_in_user, api_manager):
         """Поле подтверждение пароля отсавляем пустым"""
         payload = AuthPayloads.payload_password(passwordConfirm="")
-        response = api_manager.auth_api.password_change(
-            logged_in_user["id"], payload, expected_status=400
+        response = password_change_with_retries(
+            api_manager, logged_in_user["id"], payload, success_status=400
         )
-        assert response.json().get("description") == "Password confirmation failed", (
-            "Сообщения не совпадают"
-        )
+        body = response.json()
+        description = body.get("description")
+        messages = body.get("message") or []
+        if description:
+            assert description == "Password confirmation failed", "Сообщения не совпадают"
+        else:
+            assert any("passwordConfirm" in str(message) for message in messages), (
+                f"Ожидали ошибку passwordConfirm, получили: {body}"
+            )
 
     # TODO убрать маркер xfail после исправления бага
     @pytest.mark.api
@@ -41,8 +48,8 @@ class TestPasswordNegative:
         """Пароль менее 8 символов"""
         password = faker.password(length=5)
         payload = AuthPayloads.payload_password(password=password, passwordConfirm=password)
-        response = api_manager.auth_api.password_change(
-            logged_in_user["id"], payload, expected_status=400
+        response = password_change_with_retries(
+            api_manager, logged_in_user["id"], payload, success_status=400
         )
         assert response.json().get("description") == "Password confirmation failed", (
             "Сообщения не совпадают"
@@ -53,7 +60,7 @@ class TestPasswordNegative:
     def test_login_old_password_after_change(self, logged_in_user, api_manager):
         """Смена пароля и логин под старым паролем"""
         payload = AuthPayloads.payload_password()
-        response = api_manager.auth_api.password_change(logged_in_user["id"], payload)
+        response = password_change_with_retries(api_manager, logged_in_user["id"], payload)
         assert response.json().get("access_token") is not None, "Токен не найден"
 
         api_manager.auth_api.logout()

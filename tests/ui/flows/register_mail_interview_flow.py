@@ -5,6 +5,7 @@ import re
 import string
 from datetime import datetime, timezone
 
+import pytest
 from playwright.sync_api import Page, expect
 
 from api.api_manager import ApiManager
@@ -22,9 +23,8 @@ from utils.data_generator import DataGenerator
 
 
 def require_mail_creds() -> None:
-    assert MailCreds.EMAIL and MailCreds.PASSWORD and MailCreds.HOST, (
-        "Mail creds are not configured. Set MAIL_HOST/MAIL_EMAIL/MAIL_PASSWORD."
-    )
+    if not (MailCreds.EMAIL and MailCreds.PASSWORD and MailCreds.HOST):
+        pytest.skip("Mail creds are not configured. Set MAIL_HOST/MAIL_EMAIL/MAIL_PASSWORD.")
 
 
 def new_plus_tagged_email() -> tuple[datetime, str, str, str, str]:
@@ -58,8 +58,8 @@ def register_ui_through_interview_first_continue(
     expect(page).to_have_url(re.compile(r".*/auth/register$"))
     register_page.fill_register_form(username, recipient_email, password)
     register_page.check_checkboxes()
-    register_page.submit_registration()
-    register_page.wait_after_successful_register()
+    access_token = register_page.submit_registration()
+    register_page.wait_after_successful_register(access_token=access_token)
 
     interview_page = InterviewPage(page)
     interview_page.expect_on_interview_route()

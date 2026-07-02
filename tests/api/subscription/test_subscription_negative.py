@@ -71,10 +71,10 @@ class TestSubscriptionNegative:
             )
 
     @allure.title("Удаление несущевствующей подписки")
-    def test_delete_non_existent_subscription(self, static_user, api_manager):
+    def test_delete_non_existent_subscription(self, verified_subscription_user, api_manager):
         request_body = {
             "subscriptionId": random.randint(10, 20),
-            "userId": static_user.id,
+            "userId": verified_subscription_user["id"],
             "orderId": str(uuid.uuid4()),
         }
 

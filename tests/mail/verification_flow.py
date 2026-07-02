@@ -17,6 +17,20 @@ from constants.constants import BASE_URL
 from mail.exceptions import MessageNotFoundError
 from mail.mail_client import MailClient
 from resources.mail_creds import MailCreds
+from tests.mail.signup_retry import (
+    INTEGRATION_MAX_ATTEMPTS,
+    LOGIN_MAX_ATTEMPTS,
+    authenticate_with_retries,
+    integration_retry_sleep_seconds,
+)
+
+_VERIFY_EMAIL_SUCCESS = {200, 302}
+_VERIFY_EMAIL_TIMEOUT = (15, 30)
+_TRANSIENT_VERIFY_ERRORS = (
+    requests.exceptions.ConnectionError,
+    requests.exceptions.ChunkedEncodingError,
+    requests.exceptions.ReadTimeout,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -66,8 +80,10 @@ def wait_imap_verification_link(
     *,
     recipient_email: str,
     since: datetime,
+    min_date: datetime | None = None,
     timeout_s: float = 180.0,
     poll_interval_s: float = 3.0,
+    settle_s: float = 5.0,
 ) -> str:
     client = MailClient(
         host=MailCreds.HOST,
@@ -80,9 +96,21 @@ def wait_imap_verification_link(
         subject="Verify Your Email",
         to_contains=recipient_email,
         since=since,
+        min_date=min_date,
         timeout_s=timeout_s,
         poll_interval_s=poll_interval_s,
     )
+    if settle_s > 0:
+        time.sleep(settle_s)
+        try:
+            message = client.find_message(
+                subject="Verify Your Email",
+                to_contains=recipient_email,
+                since=since,
+                min_date=min_date,
+            )
+        except MessageNotFoundError:
+            pass
     link = client.get_message_link(message)
     client.delete_message(message.uid)
     return link
@@ -94,30 +122,40 @@ def wait_imap_verification_link_or_resend(
     user_id: str,
     recipient_email: str,
     since: datetime,
+    min_date: datetime | None = None,
     imap_first_timeout_s: float = 90.0,
     imap_after_resend_timeout_s: float = 180.0,
     poll_interval_s: float = 3.0,
+    settle_s: float = 5.0,
 ) -> str:
     """Сначала ждём письмо из ящика (часто уже отправлено при UI sign-up).
 
     Если за `imap_first_timeout_s` письма нет — дергаем send-verification-email
     (с ретраями на rate limit) и снова ждём IMAP. Так реже попадаем в 403 сразу
     после регистрации, когда письмо уже ушло.
+
+    `min_date` — только письма после UI resend (шаг 3 ТК 422); backend принимает
+    токен только из последнего письма. `settle_s` — пауза и повторный выбор самого
+    нового письма, если второе пришло сразу после первого match.
     """
     try:
         return wait_imap_verification_link(
             recipient_email=recipient_email,
             since=since,
+            min_date=min_date,
             timeout_s=imap_first_timeout_s,
             poll_interval_s=poll_interval_s,
+            settle_s=settle_s,
         )
     except MessageNotFoundError:
         send_verification_email_with_retries(api_manager, user_id)
         return wait_imap_verification_link(
             recipient_email=recipient_email,
             since=since,
+            min_date=min_date,
             timeout_s=imap_after_resend_timeout_s,
             poll_interval_s=poll_interval_s,
+            settle_s=settle_s,
         )
 
 
@@ -126,12 +164,28 @@ def confirm_email_via_link(verification_url: str) -> None:
     token = (parse_qs(parsed.query).get("token") or [None])[0]
     assert token, "verification token is missing in link"
     base = BASE_URL.rstrip("/")
-    verify_resp = requests.get(
-        f"{base}/auth/verify-email",
-        params={"token": token},
-        timeout=15,
-    )
-    assert verify_resp.status_code in {200, 302}
+    verify_url = f"{base}/auth/verify-email"
+    last_response: requests.Response | None = None
+    for attempt in range(INTEGRATION_MAX_ATTEMPTS):
+        try:
+            last_response = requests.get(
+                verify_url,
+                params={"token": token},
+                timeout=_VERIFY_EMAIL_TIMEOUT,
+            )
+        except _TRANSIENT_VERIFY_ERRORS as exc:
+            if attempt == INTEGRATION_MAX_ATTEMPTS - 1:
+                raise exc
+            time.sleep(integration_retry_sleep_seconds(attempt))
+            continue
+        if last_response.status_code in _VERIFY_EMAIL_SUCCESS:
+            return
+        if last_response.status_code == 503:
+            time.sleep(integration_retry_sleep_seconds(attempt))
+            continue
+        assert last_response.status_code in _VERIFY_EMAIL_SUCCESS
+    assert last_response is not None
+    assert last_response.status_code in _VERIFY_EMAIL_SUCCESS
 
 
 def profile_user_id(profile: dict) -> str:
@@ -150,9 +204,28 @@ def profile_is_verified(profile: dict) -> bool:
 
 
 def assert_profile_verified(api_manager: ApiManager, email: str, password: str) -> None:
-    api_manager.auth_api.authenticate((email, password))
+    authenticate_with_retries(api_manager, email, password)
     profile = api_manager.auth_api.profile().json()
     assert profile_is_verified(profile), "User email is not verified after verification link"
+
+
+def wait_until_profile_verified(
+    api_manager: ApiManager,
+    email: str,
+    password: str,
+    *,
+    timeout_s: float = 60.0,
+    poll_s: float = 2.0,
+) -> None:
+    """Ждём isVerified=true после verify во второй вкладке (SPA/API eventual consistency)."""
+    deadline = time.time() + timeout_s
+    while time.time() < deadline:
+        authenticate_with_retries(api_manager, email, password)
+        profile = api_manager.auth_api.profile().json()
+        if profile_is_verified(profile):
+            return
+        time.sleep(poll_s)
+    assert_profile_verified(api_manager, email, password)
 
 
 def verify_api_registered_user_email(
@@ -202,7 +275,7 @@ def verify_api_registered_user_email(
 
 
 def assert_profile_not_verified(api_manager: ApiManager, email: str, password: str) -> None:
-    api_manager.auth_api.authenticate((email, password))
+    authenticate_with_retries(api_manager, email, password)
     profile = api_manager.auth_api.profile().json()
     assert not profile_is_verified(profile), (
         "Expected isVerified=false before opening verification link"
@@ -213,7 +286,7 @@ def assert_profile_specialization_selected(
     api_manager: ApiManager, email: str, password: str
 ) -> None:
     """После онбординга в профиле должна быть выбранная специализация (specializationId != 0)."""
-    api_manager.auth_api.authenticate((email, password))
+    authenticate_with_retries(api_manager, email, password)
     profile = api_manager.auth_api.profile().json()
     profiles = profile.get("profiles") or []
     assert profiles, "profiles missing in /auth/profile"
@@ -229,7 +302,7 @@ def authenticate_for_teardown(
     email: str,
     password: str,
     *,
-    max_attempts: int = 3,
+    max_attempts: int = LOGIN_MAX_ATTEMPTS,
 ) -> TeardownAuthResult:
     """Login для teardown: отделяем неверный пароль от 503/сети (не путать с ValueError от authenticate)."""
     for attempt in range(max_attempts):
@@ -244,7 +317,7 @@ def authenticate_for_teardown(
         ) as exc:
             if attempt == max_attempts - 1:
                 raise exc
-            time.sleep(1.5 * (attempt + 1))
+            time.sleep(integration_retry_sleep_seconds(attempt))
             continue
 
         if resp.status_code == 201:
@@ -261,7 +334,7 @@ def authenticate_for_teardown(
         if resp.status_code == 503:
             if attempt == max_attempts - 1:
                 return "transient_failed"
-            time.sleep(1.5 * (attempt + 1))
+            time.sleep(integration_retry_sleep_seconds(attempt))
             continue
         raise ValueError(
             f"Unexpected teardown login status {resp.status_code}: {resp.text[:300]!r}"

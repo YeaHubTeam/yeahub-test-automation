@@ -13,7 +13,6 @@ import testit
 from playwright.sync_api import Page
 
 from pages.auth.login_page import LoginPage
-from pages.interview.interview_page import InterviewPage
 from utils.reporting import report_step
 
 
@@ -42,7 +41,6 @@ def test_login_with_email_and_password_desktop(page: Page, registered_user: dict
     username = registered_user["username"]
 
     login_page = LoginPage(page)
-    interview_page = InterviewPage(page)
 
     with report_step(
         "Предусловие 1: пользователь зарегистрирован по email с валидным паролем",
@@ -87,5 +85,4 @@ def test_login_with_email_and_password_desktop(page: Page, registered_user: dict
         "Шаг 4: нажать кнопку «Вход»",
         "Пользователь успешно авторизован, выполнен переход на страницу /interview",
     ):
-        login_page.submit()
-        interview_page.expect_authorized_after_login(username=username)
+        login_page.login_expecting_authorized(email, password, username=username)

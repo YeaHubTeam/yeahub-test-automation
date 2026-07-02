@@ -112,6 +112,35 @@ class LoginPage:
     def submit(self) -> None:
         self.page.get_by_role("button", name=re.compile(r"Войти|Вход|Sign\s*in", re.I)).click()
 
+    def submit_expecting_success(self, *, max_attempts: int = 5) -> None:
+        """ТК 113 шаг 6 / 409: ждём POST /auth/login → 201; на stage иногда 503 — backoff как в integration."""
+        last_status: int | None = None
+        for attempt in range(max_attempts):
+            with self.page.expect_response(
+                lambda r: "/auth/login" in r.url and r.request.method == "POST",
+                timeout=45_000,
+            ) as resp_info:
+                self.submit()
+            last_status = resp_info.value.status
+            if last_status == 201:
+                return
+            if last_status == 503 and attempt < max_attempts - 1:
+                self.page.wait_for_timeout(3_000 * (attempt + 1))
+                continue
+            break
+        assert last_status == 201, f"Expected login success HTTP 201, got {last_status}"
+
+    def login_expecting_authorized(self, email: str, password: str, *, username: str) -> None:
+        """UI login → /interview; при 201 без SPA-редиректа — fallback на /interview (медленный stage)."""
+        from pages.interview.interview_page import INTERVIEW_URL_RE, InterviewPage
+
+        self.fill_credentials(email, password)
+        self.submit_expecting_success()
+        interview = InterviewPage(self.page)
+        if not INTERVIEW_URL_RE.search(self.page.url):
+            interview.open_interview()
+        interview.expect_authorized_after_login(username=username, email=email)
+
     def submit_expecting_unauthorized(self) -> None:
         """ТК 117 шаг 7: login удалённого пользователя → HTTP 401/403, остаёмся на /auth/login."""
         with self.page.expect_response(

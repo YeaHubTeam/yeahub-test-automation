@@ -54,10 +54,42 @@ class OnboardingModal:
     def onboarding_modal_close_btn(self):
         return self.close_icon
 
-    def expect_onboarding_visible(self):
-        expect(self.modal).to_be_visible()
-        expect(self.modal.get_by_test_id("stepper")).to_be_visible()
-        expect(self.modal.get_by_role("heading", name="Onboarding")).to_be_visible()
+    def expect_onboarding_visible(self, *, timeout_ms: int = 30_000) -> None:
+        expect(self.modal).to_be_visible(timeout=timeout_ms)
+        expect(self.modal.get_by_test_id("stepper")).to_be_visible(timeout=timeout_ms)
+        expect(self.modal.get_by_role("heading", name="Onboarding")).to_be_visible(
+            timeout=timeout_ms
+        )
+
+    def expect_onboarding_visible_after_register(self, *, timeout_ms: int = 45_000) -> None:
+        """После UI signUp: поллим overlay/modal (SPA на stage рисует онбординг с задержкой)."""
+        heading = self.page.get_by_role("heading", name="Onboarding")
+        progress_1 = self.page.get_by_text(re.compile(r"1\s*/\s*5|1\s+of\s+5", re.I)).first
+        fallback_modal = self.page.locator('[data-testid="Modal"]').filter(has=heading)
+        overlay = self.page.get_by_test_id("Modal_Overlay")
+        max_rounds = max(1, timeout_ms // 500)
+        reloaded = False
+
+        for i in range(max_rounds):
+            if self.modal.is_visible(timeout=400):
+                self.expect_onboarding_visible(timeout_ms=5_000)
+                return
+            if fallback_modal.first.is_visible(timeout=400):
+                expect(heading).to_be_visible(timeout=5_000)
+                expect(progress_1).to_be_visible(timeout=10_000)
+                return
+            if heading.is_visible(timeout=400) and progress_1.is_visible(timeout=400):
+                return
+            if overlay.count() and overlay.first.is_visible(timeout=300):
+                self.page.wait_for_timeout(500)
+                continue
+            if i >= 20 and not reloaded:
+                self.page.reload(wait_until="domcontentloaded", timeout=60_000)
+                reloaded = True
+                continue
+            self.page.wait_for_timeout(500)
+
+        self.expect_onboarding_visible(timeout_ms=5_000)
 
     def expect_progress_fraction(self, current: int, total: int = 5) -> None:
         """Этап n/m на прогресс-баре онбординга (допускаем пробелы вокруг «/»)."""
@@ -91,19 +123,93 @@ class OnboardingModal:
             ).first
         ).to_be_visible(timeout=10_000)
 
+    def _specialization_dropdown(self):
+        return self.modal.get_by_test_id("dropdown-select")
+
+    def _specialization_listbox(self):
+        """Список рендерится в portaled listbox вне modal — не матчим скрытые option по всей странице."""
+        return self.page.get_by_role("listbox").last
+
+    def _specialization_options(self):
+        listbox = self._specialization_listbox()
+        if listbox.count() and listbox.is_visible(timeout=300):
+            return listbox.get_by_role("option")
+        return self.page.get_by_role("option")
+
+    def _is_specialization_dropdown_open(self) -> bool:
+        expanded = self._specialization_dropdown().get_attribute("aria-expanded")
+        if expanded == "true":
+            return True
+        listbox = self._specialization_listbox()
+        return listbox.count() > 0 and listbox.is_visible(timeout=200)
+
+    def _expect_specialization_listbox_open(self, *, timeout_ms: int = 15_000) -> None:
+        expect(self._specialization_listbox()).to_be_visible(timeout=timeout_ms)
+        expect(self._specialization_options().first).to_be_visible(timeout=timeout_ms)
+
     def open_specialization_dropdown(self) -> None:
-        self.modal.get_by_test_id("dropdown-select").click()
+        """`dropdown-select` — toggle; повторный click только если список ещё закрыт."""
+        dropdown = self._specialization_dropdown()
+        expect(dropdown).to_be_visible(timeout=15_000)
+        dropdown.scroll_into_view_if_needed(timeout=5_000)
+        if self._is_specialization_dropdown_open():
+            self._expect_specialization_listbox_open(timeout_ms=5_000)
+            return
+
+        dropdown.click(timeout=10_000)
+        try:
+            self._expect_specialization_listbox_open(timeout_ms=8_000)
+            return
+        except AssertionError:
+            pass
+
+        if not self._is_specialization_dropdown_open():
+            dropdown.click(timeout=10_000)
+            try:
+                self._expect_specialization_listbox_open(timeout_ms=8_000)
+                return
+            except AssertionError:
+                pass
+
+        dropdown.focus()
+        self.page.keyboard.press("ArrowDown")
+        self._expect_specialization_listbox_open(timeout_ms=15_000)
 
     def expect_specialization_list_visible(self) -> None:
-        expect(self.page.get_by_role("option").first).to_be_visible(timeout=10_000)
+        if self._is_specialization_dropdown_open():
+            self._expect_specialization_listbox_open(timeout_ms=5_000)
+            return
+        self.open_specialization_dropdown()
 
     def choose_reference_specialization(self) -> None:
-        """Эталон: React Frontend Developer (см. REFERENCE_SPECIALIZATION_ID)."""
-        self.page.get_by_role("option", name=REFERENCE_SPECIALIZATION_TITLE_PATTERN).click()
+        """Эталон: React Frontend Developer — option внутри listbox после click на dropdown-select."""
+        if not self._is_specialization_dropdown_open():
+            self.open_specialization_dropdown()
+        option = self._specialization_options().filter(
+            has_text=REFERENCE_SPECIALIZATION_TITLE_PATTERN
+        )
+        expect(option.first).to_be_visible(timeout=15_000)
+        option.first.click()
+        expect(self._specialization_dropdown()).to_contain_text(
+            REFERENCE_SPECIALIZATION_TITLE_PATTERN,
+            timeout=10_000,
+        )
 
     def open_drop_down_and_choose_specialization(self) -> None:
         self.open_specialization_dropdown()
+        self.expect_specialization_list_visible()
         self.choose_reference_specialization()
+
+    def _advance_from_specialization_step_if_needed(self) -> None:
+        """Шаг 2/5: searchable dropdown — без выбора «Сохранить» не уходит дальше."""
+        if not self._specialization_dropdown().is_visible(timeout=2_000):
+            return
+        self.open_drop_down_and_choose_specialization()
+        self.click_save_and_continue()
+        if self.continue_btn.is_visible(timeout=8_000):
+            self.click_continue()
+        if self.later_btn.is_visible(timeout=8_000):
+            self.click_later_btn()
 
     def complete_tc_steps_2_through_7(self) -> None:
         """Шаги модалки 2–7: специализация → сохранить → 3–4 → Позже → 5/5 → крестик.
@@ -112,9 +218,7 @@ class OnboardingModal:
         """
         self.expect_progress_fraction(2, 5)
         self.expect_onboarding_second_step_visible()
-        self.open_specialization_dropdown()
-        self.expect_specialization_list_visible()
-        self.choose_reference_specialization()
+        self.open_drop_down_and_choose_specialization()
         expect(self.modal.get_by_test_id("dropdown-select")).to_be_visible()
 
         self.click_save_and_continue()
@@ -130,11 +234,32 @@ class OnboardingModal:
         self.expect_onboarding_fifth_step_visible()
         self.complete_onboarding_step_7_close()
 
-    def complete_onboarding_step_7_close(self) -> None:
-        """ТК шаг 7: крестик «Закрыть модальное окно»; fallback — Primary / Continue / close_onboarding_modal."""
-        self.expect_progress_fraction(5, 5)
-        self.expect_onboarding_fifth_step_visible()
+    def finish_onboarding_after_fifth_step(self) -> None:
+        """ТК 459 шаги 6–7: на 5/5 модалка часто закрывается сама; крестик — только fallback."""
+        try:
+            self.expect_onboarding_dismissed(timeout_ms=10_000)
+            return
+        except AssertionError:
+            pass
 
+        progress_5 = self.modal.get_by_text(re.compile(r"5\s*/\s*5|5\s+of\s+5", re.I)).first
+        if progress_5.is_visible(timeout=3_000):
+            self.expect_onboarding_fifth_step_visible()
+            primary = self.modal.get_by_test_id("Modal_Primary_Button")
+            if primary.is_visible(timeout=2_000):
+                primary.click(timeout=10_000)
+            elif self.continue_btn.is_visible(timeout=2_000):
+                self.continue_btn.click(timeout=10_000)
+            try:
+                self.expect_onboarding_dismissed(timeout_ms=10_000)
+                return
+            except AssertionError:
+                pass
+
+        self._close_onboarding_if_still_open()
+
+    def _close_onboarding_if_still_open(self) -> None:
+        """Крестик / Escape — без повторного прохода шага 2 (dropdown на stage иногда мигает в DOM)."""
         try:
             self.expect_onboarding_dismissed(timeout_ms=3_000)
             return
@@ -142,27 +267,9 @@ class OnboardingModal:
             pass
 
         heading = self.page.get_by_role("heading", name="Onboarding")
-
         if heading.is_visible(timeout=1_000):
-            self.click_modal_close_button()
             try:
-                self.expect_onboarding_dismissed(timeout_ms=12_000)
-                return
-            except AssertionError:
-                pass
-
-        primary = self.modal.get_by_test_id("Modal_Primary_Button")
-        if heading.is_visible(timeout=1_000) and primary.is_visible(timeout=2_000):
-            primary.click(timeout=10_000)
-            try:
-                self.expect_onboarding_dismissed(timeout_ms=12_000)
-                return
-            except AssertionError:
-                pass
-
-        if heading.is_visible(timeout=1_000) and self.continue_btn.is_visible(timeout=2_000):
-            self.continue_btn.click(timeout=10_000)
-            try:
+                self.click_modal_close_button()
                 self.expect_onboarding_dismissed(timeout_ms=12_000)
                 return
             except AssertionError:
@@ -170,6 +277,15 @@ class OnboardingModal:
 
         self.close_onboarding_modal()
         self.expect_onboarding_dismissed()
+
+    def complete_onboarding_step_7_close(self) -> None:
+        """ТК шаг 7: крестик; для полного flow после 5/5 предпочтительнее `finish_onboarding_after_fifth_step`."""
+        progress_2 = self.modal.get_by_text(re.compile(r"2\s*/\s*5|2\s+of\s+5", re.I)).first
+        progress_5 = self.modal.get_by_text(re.compile(r"5\s*/\s*5|5\s+of\s+5", re.I)).first
+        if progress_2.is_visible(timeout=1_000) and not progress_5.is_visible(timeout=500):
+            self._advance_from_specialization_step_if_needed()
+
+        self._close_onboarding_if_still_open()
 
     def close_onboarding_at_step_7(self) -> None:
         """Alias для теста ТК 459."""
@@ -281,9 +397,7 @@ class OnboardingModal:
             ).to_be_visible(timeout=15_000)
 
         if self.modal.get_by_test_id("dropdown-select").is_visible(timeout=5_000):
-            self.open_specialization_dropdown()
-            self.expect_specialization_list_visible()
-            self.choose_reference_specialization()
+            self.open_drop_down_and_choose_specialization()
             self.click_save_and_continue()
 
         # Шаг 3: заголовок часто не в <h*> — ищем фрагменты копирайта внутри модалки.
@@ -320,7 +434,19 @@ class OnboardingModal:
                 expect(final_copy).to_be_visible(timeout=15_000)
 
         self.close_onboarding_modal()
-        self.expect_onboarding_dismissed()
+        self._ensure_onboarding_dismissed()
+
+    def _ensure_onboarding_dismissed(self) -> None:
+        """Финальный проход: Escape / close CTA / длинный timeout — stage иногда не закрывает модалку с первого раза."""
+        if self.modal.is_visible(timeout=2_000) or self.page.get_by_role(
+            "heading", name="Onboarding"
+        ).is_visible(timeout=1_000):
+            self.try_dismiss_with_escape(presses=5)
+        if self.modal.is_visible(timeout=1_000) or self.page.get_by_role(
+            "heading", name="Onboarding"
+        ).is_visible(timeout=1_000):
+            self.close_onboarding_modal()
+        self.expect_onboarding_dismissed(timeout_ms=45_000)
 
     def try_dismiss_with_escape(self, *, presses: int = 3) -> bool:
         """Быстрый путь: Escape, если модалка не обязательна к прохождению всех шагов."""

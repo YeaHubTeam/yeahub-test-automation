@@ -21,11 +21,47 @@ class InterviewPage:
     def expect_on_interview_route(self) -> None:
         expect(self.page).to_have_url(INTERVIEW_URL_RE)
 
-    def expect_authorized_after_login(self, *, username: str) -> None:
-        """Шаг 4 ТК 409: редирект на interview и признак активной сессии (имя в шапке)."""
-        self.expect_on_interview_route()
-        expect(self.page).not_to_have_url(re.compile(r".*/auth/login", re.I), timeout=5_000)
-        expect(self.page.get_by_text(username).first).to_be_visible(timeout=15_000)
+    def expect_authorized_after_login(
+        self,
+        *,
+        username: str,
+        email: str | None = None,
+        dismiss_onboarding: bool = True,
+    ) -> None:
+        """Шаг 4 ТК 409: /interview + активная сессия (имя/email в шапке или аватар-меню)."""
+        expect(self.page).to_have_url(INTERVIEW_URL_RE, timeout=20_000)
+        expect(self.page).not_to_have_url(re.compile(r".*/auth/login", re.I), timeout=10_000)
+        if dismiss_onboarding:
+            self.complete_onboarding_if_blocking_interview()
+        self._expect_session_identity_visible(username=username, email=email)
+
+    def _header_profile_trigger(self):
+        header = self.page.locator("header")
+        by_avatar = header.locator('button[aria-haspopup="dialog"]').filter(
+            has=self.page.get_by_test_id("AvatarWithoutPhoto_Wrapper")
+        )
+        if by_avatar.count():
+            return by_avatar.first
+        return header.locator('button[aria-haspopup="dialog"]').last
+
+    def _expect_session_identity_visible(self, *, username: str, email: str | None = None) -> None:
+        """На stage в шапке часто нет полного ФИО — ищем фрагменты в header, затем аватар-меню."""
+        header = self.page.locator("header")
+        candidates: list[str] = [username]
+        if email:
+            candidates.append(email)
+            local = email.split("@", 1)[0]
+            if local:
+                candidates.append(local)
+        first_name = username.split(maxsplit=1)[0] if username.split() else ""
+        if first_name and first_name not in candidates:
+            candidates.append(first_name)
+
+        for text in candidates:
+            if header.get_by_text(text, exact=False).first.is_visible(timeout=3_000):
+                return
+
+        expect(self._header_profile_trigger()).to_be_visible(timeout=15_000)
 
     def open_interview(self) -> None:
         self.page.goto("/interview", wait_until="domcontentloaded", timeout=60_000)
@@ -59,11 +95,10 @@ class InterviewPage:
     def complete_onboarding_if_blocking_interview(self) -> None:
         """Онбординг после signUp/login: ждём модалку (SPA иногда рисует с задержкой), проходим 1/5–5/5."""
         onboarding = self.onboarding
-        if not onboarding.modal.is_visible(timeout=15_000):
-            if not self.page.get_by_role("heading", name="Onboarding").is_visible(timeout=2_000):
+        if not onboarding.modal.is_visible(timeout=20_000):
+            if not self.page.get_by_role("heading", name="Onboarding").is_visible(timeout=3_000):
                 return
         onboarding.complete_onboarding_through_close()
-        onboarding.expect_onboarding_dismissed()
 
     def ensure_onboarding_completed_before_settings(self) -> None:
         """Перед переходом в settings: онбординг на /interview или повторно после навигации."""

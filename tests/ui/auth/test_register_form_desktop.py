@@ -6,7 +6,7 @@
 
 Teardown: удаление пользователя через API.
 
-Email: `DataGenerator.random_email()` — UI smoke без IMAP (`MAIL_*` не нужны; scope ui-auth).
+Email: `DataGenerator.unique_email()` — UI smoke без IMAP (`MAIL_*` не нужны; scope ui-auth).
 """
 
 import re
@@ -43,8 +43,8 @@ from utils.reporting import report_step
 )
 def test_register_form_desktop(page: Page, api_manager: ApiManager):
     """Регистрация: форма, согласия, переход на interview (desktop)."""
-    username = DataGenerator.random_username()
-    email = DataGenerator.random_email()
+    username = DataGenerator.unique_username()
+    email = DataGenerator.unique_email()
     password = DataGenerator.random_password()
 
     register_page = RegisterPage(page)
@@ -89,10 +89,10 @@ def test_register_form_desktop(page: Page, api_manager: ApiManager):
         "Шаг 9: «Зарегистрироваться»",
         "URL /interview; модалка Onboarding 1/5 видна (онбординг не проходим)",
     ):
-        register_page.submit_registration()
-        register_page.wait_after_successful_register()
+        access_token = register_page.submit_registration()
+        register_page.wait_after_successful_register(access_token=access_token)
         interview_page.expect_on_interview_route()
-        interview_page.onboarding.expect_onboarding_visible()
+        interview_page.onboarding.expect_onboarding_visible_after_register(timeout_ms=45_000)
 
     with report_step(
         "Постусловие: удалить пользователя через API",

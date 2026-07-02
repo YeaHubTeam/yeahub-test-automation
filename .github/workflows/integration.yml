@@ -22,9 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
-      VERIFIED_USER_EMAIL: ${{ secrets.VERIFIED_USER_EMAIL }}
-      VERIFIED_USER_PASSWORD: ${{ secrets.VERIFIED_USER_PASSWORD }}
-      # Mail (IMAP) secrets: scope=mail, nightly mail-e2e, ui-payment TC 116
+      # Mail (IMAP): subscription API/UI payment, mail e2e, ui-payment TC 116
       MAIL_HOST: ${{ secrets.MAIL_HOST }}
       MAIL_PORT: ${{ secrets.MAIL_PORT }}
       MAIL_EMAIL: ${{ secrets.MAIL_EMAIL }}
@@ -69,7 +67,7 @@ jobs:
           set -euo pipefail
           SUBSCRIPTIONS_URL="https://api.yeatwork.ru/subscriptions"
           AUTH_URL="https://api.yeatwork.ru/auth/refresh"
-          for attempt in 1 2 3 4 5; do
+          for attempt in 1 2 3 4 5 6 7 8; do
             subscriptions_status="$(curl --connect-timeout 5 --max-time 15 -sS -o /dev/null -w "%{http_code}" "$SUBSCRIPTIONS_URL" || true)"
             auth_status="$(curl --connect-timeout 5 --max-time 15 -sS -o /dev/null -w "%{http_code}" "$AUTH_URL" || true)"
 
@@ -77,13 +75,13 @@ jobs:
               echo "API preflight is healthy on attempt $attempt (subscriptions=$subscriptions_status, auth=$auth_status)"
               exit 0
             fi
-            echo "API preflight not ready (subscriptions=$subscriptions_status, auth=$auth_status), attempt $attempt/5"
-            if [ "$attempt" = "5" ]; then
+            echo "API preflight not ready (subscriptions=$subscriptions_status, auth=$auth_status), attempt $attempt/8"
+            if [ "$attempt" = "8" ]; then
               break
             fi
-            sleep 10
+            sleep 15
           done
-          echo "API preflight failed. Expected subscriptions=200 and auth=200/401/403 after 5 attempts."
+          echo "API preflight failed. Expected subscriptions=200 and auth=200/401/403 after 8 attempts."
           exit 1
 
       - name: Run integration tests with Allure
@@ -108,24 +106,17 @@ jobs:
           }
 
           run_ui_payment() {
-            echo "UI payment: T-Bank subscription checkout (API link; VERIFIED_USER_* secrets)"
-            : "${VERIFIED_USER_EMAIL:?VERIFIED_USER_EMAIL secret is required for ui-payment}"
-            : "${VERIFIED_USER_PASSWORD:?VERIFIED_USER_PASSWORD secret is required for ui-payment}"
+            echo "UI payment: T-Bank subscription checkout (verified user via MAIL_*)"
+            : "${MAIL_HOST:?MAIL_HOST secret is required for ui-payment}"
+            : "${MAIL_EMAIL:?MAIL_EMAIL secret is required for ui-payment}"
+            : "${MAIL_PASSWORD:?MAIL_PASSWORD secret is required for ui-payment}"
+            export RUN_MAIL_INTEGRATION=1
             export APP_BASE_URL="${APP_BASE_URL:-https://app.yeatwork.ru}"
             export CI=true
             uv run pytest -q \
               tests/ui/subscription/test_subscription_payment_ui.py \
+              tests/ui/subscription/test_subscription_tariff_card_desktop.py \
               --alluredir=allure-results --testit
-
-            if [ -n "${MAIL_HOST:-}" ] && [ -n "${MAIL_EMAIL:-}" ] && [ -n "${MAIL_PASSWORD:-}" ]; then
-              echo "UI payment TC 116: full tariff checkout (MAIL_* + RUN_MAIL_INTEGRATION=1)"
-              export RUN_MAIL_INTEGRATION=1
-              uv run pytest -q \
-                tests/ui/subscription/test_subscription_tariff_card_desktop.py \
-                --alluredir=allure-results --testit
-            else
-              echo "Skipping TC 116: MAIL_HOST / MAIL_EMAIL / MAIL_PASSWORD not set"
-            fi
           }
 
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.scope }}" = "mail" ]; then
@@ -168,10 +159,10 @@ jobs:
           fi
           if [ "${RUN_UI_AFTER_API}" = "true" ]; then
             run_ui_auth_smoke
-            if [ -n "${VERIFIED_USER_EMAIL:-}" ] && [ -n "${VERIFIED_USER_PASSWORD:-}" ]; then
+            if [ -n "${MAIL_HOST:-}" ] && [ -n "${MAIL_EMAIL:-}" ] && [ -n "${MAIL_PASSWORD:-}" ]; then
               run_ui_payment
             else
-              echo "Skipping UI payment: VERIFIED_USER_EMAIL / VERIFIED_USER_PASSWORD not set"
+              echo "Skipping UI payment: MAIL_HOST / MAIL_EMAIL / MAIL_PASSWORD not set"
             fi
           fi
 
@@ -273,7 +264,7 @@ jobs:
           set -euo pipefail
           SUBSCRIPTIONS_URL="https://api.yeatwork.ru/subscriptions"
           AUTH_URL="https://api.yeatwork.ru/auth/refresh"
-          for attempt in 1 2 3 4 5; do
+          for attempt in 1 2 3 4 5 6 7 8; do
             subscriptions_status="$(curl --connect-timeout 5 --max-time 15 -sS -o /dev/null -w "%{http_code}" "$SUBSCRIPTIONS_URL" || true)"
             auth_status="$(curl --connect-timeout 5 --max-time 15 -sS -o /dev/null -w "%{http_code}" "$AUTH_URL" || true)"
 
@@ -281,13 +272,13 @@ jobs:
               echo "API preflight is healthy on attempt $attempt (subscriptions=$subscriptions_status, auth=$auth_status)"
               exit 0
             fi
-            echo "API preflight not ready (subscriptions=$subscriptions_status, auth=$auth_status), attempt $attempt/5"
-            if [ "$attempt" = "5" ]; then
+            echo "API preflight not ready (subscriptions=$subscriptions_status, auth=$auth_status), attempt $attempt/8"
+            if [ "$attempt" = "8" ]; then
               break
             fi
-            sleep 10
+            sleep 15
           done
-          echo "API preflight failed. Expected subscriptions=200 and auth=200/401/403 after 5 attempts."
+          echo "API preflight failed. Expected subscriptions=200 and auth=200/401/403 after 8 attempts."
           exit 1
 
       - name: Run mail e2e with Allure

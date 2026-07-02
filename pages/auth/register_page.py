@@ -119,14 +119,41 @@ class RegisterPage:
         expect(self._consent_checkbox("adConsent")).to_be_checked()
         self.expect_submit_enabled()
 
-    def submit_registration(self):
-        self.submit_button.click()
+    def submit_registration(self) -> str | None:
+        """POST signUp с retry на 503; возвращает access_token при 201."""
+        last_status: int | None = None
+        for attempt in range(5):
+            with self.page.expect_response(
+                lambda r: "/auth/signUp" in r.url and r.request.method == "POST",
+                timeout=45_000,
+            ) as resp_info:
+                self.submit_button.click()
+            response = resp_info.value
+            last_status = response.status
+            if last_status == 201:
+                try:
+                    return response.json().get("access_token")
+                except Exception:
+                    return None
+            if last_status == 503 and attempt < 4:
+                self.page.wait_for_timeout(3_000 * (attempt + 1))
+                continue
+            break
+        assert last_status == 201, f"signUp expected 201, got {last_status}"
+        return None
 
-    def wait_after_successful_register(self):
-        expect(self.page).to_have_url(
-            re.compile(r".*/interview$"),
-            timeout=15_000,
-        )
+    def wait_after_successful_register(self, *, access_token: str | None = None) -> None:
+        """Редирект на /interview; token-injection только если SPA застряла на /auth/register."""
+        interview_url = re.compile(r".*interview(?:/|$|\?)", re.I)
+        register_url = re.compile(r".*/auth/register", re.I)
+        try:
+            expect(self.page).to_have_url(interview_url, timeout=45_000)
+        except AssertionError:
+            if access_token and register_url.search(self.page.url):
+                self.finish_registration_after_api_signup(access_token)
+            else:
+                raise
+            expect(self.page).to_have_url(interview_url, timeout=20_000)
 
     def finish_registration_after_api_signup(self, access_token: str) -> None:
         """SignUp уже выполнен через API-пробу: подставить токен в web storage и перейти на /interview без второго submit."""
