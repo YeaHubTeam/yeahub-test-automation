@@ -17,12 +17,8 @@ from constants.constants import BASE_URL
 from mail.exceptions import MessageNotFoundError
 from mail.mail_client import MailClient
 from resources.mail_creds import MailCreds
-from tests.mail.signup_retry import (
-    INTEGRATION_MAX_ATTEMPTS,
-    LOGIN_MAX_ATTEMPTS,
-    authenticate_with_retries,
-    integration_retry_sleep_seconds,
-)
+from tests.mail.signup_retry import authenticate_with_retries
+from utils.retry import INTEGRATION_MAX_ATTEMPTS, LOGIN_MAX_ATTEMPTS
 
 _VERIFY_EMAIL_SUCCESS = {200, 302}
 _VERIFY_EMAIL_TIMEOUT = (15, 30)

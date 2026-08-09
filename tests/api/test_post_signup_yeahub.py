@@ -32,8 +32,12 @@ class TestSignUpYeahub:
         with allure.step("Проверяем наличие юзера в ответе"):
             assert response_data.user is not None, "Данные пользователя отсутствуют в ответе"
 
-        with allure.step("Проверяем что имя юзера в ответе совпадает с именем сгенерированного юзера"):
+        with allure.step(
+            "Проверяем что имя юзера в ответе совпадает с именем сгенерированного юзера"
+        ):
             assert response_data.user.username == test_user["username"]
 
-        with allure.step("Проверяем что 'Email' юзера в ответе совпадает с 'Email' сгенерированного юзера"):
+        with allure.step(
+            "Проверяем что 'Email' юзера в ответе совпадает с 'Email' сгенерированного юзера"
+        ):
             assert response_data.user.email == test_user["email"]

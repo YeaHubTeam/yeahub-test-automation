@@ -18,9 +18,7 @@ class TestLoginYeahub:
     def test_logging_user(self, api_manager: ApiManager, test_user):
         with allure.step("Отправляем POST-запрос на создание тестового пользователя"):
             last_signup = request_with_retries(
-                lambda: api_manager.auth_api.register_user(
-                    test_user, expected_status=[201, 503]
-                ),
+                lambda: api_manager.auth_api.register_user(test_user, expected_status=[201, 503]),
                 success_status=201,
             )
             assert last_signup is not None
@@ -32,9 +30,7 @@ class TestLoginYeahub:
                 "password": test_user["password"],
             }
             last_login = request_with_retries(
-                lambda: api_manager.auth_api.login_user(
-                    login_data, expected_status=[201, 503]
-                ),
+                lambda: api_manager.auth_api.login_user(login_data, expected_status=[201, 503]),
                 success_status=201,
             )
             assert last_login is not None

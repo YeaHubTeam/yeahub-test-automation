@@ -1,7 +1,9 @@
 from __future__ import annotations
+
 import time
 from collections.abc import Callable
 from typing import Any
+
 import requests
 
 _TRANSIENT_NETWORK_ERRORS = (
@@ -10,20 +12,24 @@ _TRANSIENT_NETWORK_ERRORS = (
 )
 
 DEFAULT_MAX_ATTEMPTS = 5
+INTEGRATION_MAX_ATTEMPTS = 8
+SIGNUP_MAX_ATTEMPTS = INTEGRATION_MAX_ATTEMPTS
+LOGIN_MAX_ATTEMPTS = INTEGRATION_MAX_ATTEMPTS
+
 
 def default_backoff(attempt: int) -> float:
     return 2 * (attempt + 1)
 
+
 def request_with_retries(
-        request_fn: Callable[[], requests.Response],
-        *,
-        success_status: int | set[int] = 201,
-        max_attempts: int = DEFAULT_MAX_ATTEMPTS,
-        backoff: Callable[[int], float] = default_backoff,
-        on_retry: Callable[[int, requests.Response], None] | None = None,
-    ) -> requests.Response:
-    success_set = {success_status} if isinstance(success_status, int) else
-    set(success_status)
+    request_fn: Callable[[], requests.Response],
+    *,
+    success_status: int | set[int] = 201,
+    max_attempts: int = DEFAULT_MAX_ATTEMPTS,
+    backoff: Callable[[int], float] = default_backoff,
+    on_retry: Callable[[int, requests.Response], None] | None = None,
+) -> requests.Response:
+    success_set = {success_status} if isinstance(success_status, int) else set(success_status)
     last_response: requests.Response | None = None
 
     for attempt in range(max_attempts):

@@ -2,8 +2,7 @@ import random
 import string
 import uuid
 
-from fa
-er import Faker
+from faker import Faker
 
 faker = Faker()
 
@@ -55,7 +54,7 @@ class DataGenerator:
 
     @staticmethod
     def random_birthday():
-        birthday = faker.date_of_birth(minimum_age=16, maximumage_age=100)
+        birthday = faker.date_of_birth(minimum_age=16, maximum_age=100)
         return birthday.strftime("%Y-%m-%d")
 
     @staticmethod

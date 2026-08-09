@@ -8,16 +8,20 @@ from urllib3.util.retry import Retry
 
 from api.api_manager import ApiManager
 from models.Subscriptions.model_subscription import ModelSubscriptionResponse
-from tests.mail.signup_retry import (
-    authenticate_with_retries,
-    request_with_integration_retries,
-)
-from utils.write_fixtures import create_registered_user, cleanup_user, create_verified_mail_registered_user, create_unverified_mail_registered_user
+from tests.mail.signup_retry import authenticate_with_retries
 from tests.mail.verified_user import provision_verified_mail_user, yield_payment_link_subscriptions
 from utils.data_generator import DataGenerator
 from utils.helpers import DataUtils
+from utils.retry import request_with_retries
+from utils.write_fixtures import (
+    cleanup_user,
+    create_registered_user,
+    create_unverified_mail_registered_user,
+    create_verified_mail_registered_user,
+)
 
 load_dotenv()
+
 
 def _session_with_retries() -> requests.Session:
     """Транспортные ретраи на сетевые ошибки (без ретраев по HTTP-статусам).
@@ -85,6 +89,7 @@ def unverified_mail_registered_user(api_manager, test_user):
     yield test_user
     cleanup_user(api_manager, test_user)
 
+
 @pytest.fixture
 def verified_registered_user(api_manager, test_user):
     """signUp → IMAP verify → teardown delete. Для mail/UI с `isVerified=true` (не для TC 113).
@@ -94,6 +99,7 @@ def verified_registered_user(api_manager, test_user):
     create_verified_mail_registered_user(api_manager, test_user)
     yield test_user
     cleanup_user(api_manager, test_user)
+
 
 @pytest.fixture(scope="module")
 def verified_subscription_user(api_manager):
