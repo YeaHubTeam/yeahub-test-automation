@@ -103,7 +103,7 @@ def yield_payment_link_subscriptions(
         transform=lambda sub: sub.id,
     )
 
-    last_response = request_with_integration_retries(
+    last_response = request_with_retries(
         lambda: api_manager.subscriptions_api.subscriptions_payment_pending(
             id_subscriptions,
             user_email,

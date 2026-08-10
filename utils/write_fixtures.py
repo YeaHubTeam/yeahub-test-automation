@@ -53,7 +53,7 @@ def _make_mail_identity_refresher(mail_identity: dict, test_user: dict):
         mail_identity["started_at"] = new_started_at
         test_user["email"] = new_email
         test_user["password"] = new_password
-        test_user[""] = new_username
+        test_user["username"] = new_username
 
     return _refresh
 

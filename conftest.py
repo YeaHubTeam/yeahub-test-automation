@@ -105,7 +105,6 @@ def verified_registered_user(api_manager, test_user):
 def verified_subscription_user(api_manager):
     """Verified user per API subscription module (signUp → IMAP verify → delete)."""
     user = provision_verified_mail_user(api_manager)
-    create_verified_mail_registered_user(api_manager, user)
     yield user
     cleanup_user(api_manager, user)
 
@@ -120,7 +119,7 @@ def logged_in_user(api_manager, registered_user):
 
 @pytest.fixture(scope="session")
 def get_list_subscriptions(api_manager):
-    last_response = request_with_integration_retries(
+    last_response = request_with_retries(
         lambda: api_manager.subscriptions_api.get_subscriptions(expected_status=[200, 503]),
     )
     assert last_response.status_code == 200, "subscriptions list is unavailable (503) after retries"
