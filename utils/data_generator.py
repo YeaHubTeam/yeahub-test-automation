@@ -54,10 +54,8 @@ class DataGenerator:
 
     @staticmethod
     def random_birthday():
-        year = random.randint(1950, 2007)
-        month = faker.month()
-        day = faker.day_of_month()
-        return f"{year}-{month}-{day}"
+        birthday = faker.date_of_birth(minimum_age=16, maximum_age=100)
+        return birthday.strftime("%Y-%m-%d")
 
     @staticmethod
     def random_address():

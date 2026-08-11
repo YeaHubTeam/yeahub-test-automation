@@ -7,6 +7,9 @@ from models.refresh_token_response_model import RefreshTokenResponse
 pytestmark = [pytest.mark.api, pytest.mark.integration, pytest.mark.regression, pytest.mark.pr_safe]
 
 
+@pytest.mark.xfail(
+    reason="Backend bug: GET /auth/refresh returns unrelated user (YH-2236)", strict=True
+)
 @allure.epic("Тест - Refresh authentication token")
 @pytest.mark.api
 @pytest.mark.smoke
@@ -19,5 +22,11 @@ class TestRefreshYeahub:
             response = api_manager.auth_api.refresh_auth_token().json()
             response_data = RefreshTokenResponse(**response)
 
-        with allure.step("Проверяем что получили новый токен"):
+        with allure.step("Проверяем, что получили новый токен"):
             assert "access_token" in response_data or "accessToken" in response_data
+        with allure.step("Проверяем, что данные пользователя в refresh-ответе корректны"):
+            user = response_data.user
+            assert str(user.id) == str(logged_in_user["id"]), (
+                "Unexpected user_id in refresh response"
+            )
+            assert user.email == logged_in_user["email"], "Unexpected email in refresh response"

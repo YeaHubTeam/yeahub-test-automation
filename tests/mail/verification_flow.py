@@ -17,12 +17,8 @@ from constants.constants import BASE_URL
 from mail.exceptions import MessageNotFoundError
 from mail.mail_client import MailClient
 from resources.mail_creds import MailCreds
-from tests.mail.signup_retry import (
-    INTEGRATION_MAX_ATTEMPTS,
-    LOGIN_MAX_ATTEMPTS,
-    authenticate_with_retries,
-    integration_retry_sleep_seconds,
-)
+from tests.mail.signup_retry import authenticate_with_retries
+from utils.retry import INTEGRATION_MAX_ATTEMPTS, LOGIN_MAX_ATTEMPTS, default_backoff
 
 _VERIFY_EMAIL_SUCCESS = {200, 302}
 _VERIFY_EMAIL_TIMEOUT = (15, 30)
@@ -176,12 +172,12 @@ def confirm_email_via_link(verification_url: str) -> None:
         except _TRANSIENT_VERIFY_ERRORS as exc:
             if attempt == INTEGRATION_MAX_ATTEMPTS - 1:
                 raise exc
-            time.sleep(integration_retry_sleep_seconds(attempt))
+            time.sleep(default_backoff(attempt))
             continue
         if last_response.status_code in _VERIFY_EMAIL_SUCCESS:
             return
         if last_response.status_code == 503:
-            time.sleep(integration_retry_sleep_seconds(attempt))
+            time.sleep(default_backoff(attempt))
             continue
         assert last_response.status_code in _VERIFY_EMAIL_SUCCESS
     assert last_response is not None
@@ -317,7 +313,7 @@ def authenticate_for_teardown(
         ) as exc:
             if attempt == max_attempts - 1:
                 raise exc
-            time.sleep(integration_retry_sleep_seconds(attempt))
+            time.sleep(default_backoff(attempt))
             continue
 
         if resp.status_code == 201:
@@ -334,7 +330,7 @@ def authenticate_for_teardown(
         if resp.status_code == 503:
             if attempt == max_attempts - 1:
                 return "transient_failed"
-            time.sleep(integration_retry_sleep_seconds(attempt))
+            time.sleep(default_backoff(attempt))
             continue
         raise ValueError(
             f"Unexpected teardown login status {resp.status_code}: {resp.text[:300]!r}"
