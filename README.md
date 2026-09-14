@@ -19,6 +19,23 @@
 - `ruff` для линтинга и форматирования
 - `allure-pytest` для отчетов
 
+## Working with AI tools
+
+Shared project instructions live in [AGENTS.md](AGENTS.md). Maintain one version of the rules in that file.
+
+- Codex and Cursor Agent use `AGENTS.md`.
+- Claude Code imports it through `CLAUDE.md`; Gemini CLI imports it through `GEMINI.md`.
+- `.github/copilot-instructions.md` points GitHub Copilot to the shared file. Support depends on the tool version and mode; a reference does not guarantee loading in every interface.
+- If the tool does not load the instructions automatically, attach `AGENTS.md` to the request. In a regular web chat, also provide the relevant code, contract, and validation output.
+
+Before the first task, ask the tool to name the instruction files it has read and briefly summarize the project rules. If it cannot read the file, provide it explicitly. Where available, inspect the tool's list of loaded context files.
+
+To automate a manual case, provide its ID or link, preconditions, data, steps, expected results, and postconditions. If the tool cannot open the link, supply the text or a readable image. The project instructions require the AI to map the case to automated checks and identify anything left unautomated.
+
+State the expected behavior, acceptance criteria, and constraints in the task. After the AI responds, review the diff, understand the assertions, and verify the command results. The PR author is responsible for the code regardless of the model used. Instructions guide the work; CI and code review remain required checks.
+
+Setup documentation: [Codex](https://learn.chatgpt.com/docs/agent-configuration/agents-md), [Cursor](https://cursor.com/docs/rules), [Claude Code](https://code.claude.com/docs/en/memory), [Gemini CLI](https://geminicli.com/docs/cli/gemini-md/), [Copilot](https://docs.github.com/en/copilot/how-tos/configure-custom-instructions/add-repository-instructions).
+
 ## Быстрый старт
 
 ### 1. Установить Python и uv
