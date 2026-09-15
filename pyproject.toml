@@ -73,7 +73,6 @@ skip-magic-trailing-comma = false
 # Test IT adapter (testit-adapter-pytest): non-secret defaults. URL/token/project IDs — via TMS_* env or CLI.
 # https://github.com/testit-tms/adapters-python/blob/main/testit-adapter-pytest/README.md
 [testit]
-adapterMode = 2
 certValidation = true
 automaticCreationTestCases = false
 automaticUpdationLinksToTestCases = true
