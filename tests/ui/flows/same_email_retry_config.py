@@ -1,9 +1,13 @@
-"""Параметры хвоста «повторная регистрация на тот же email» в `test_register_and_verify_email_e2e`.
+"""Параметры и polling-хелпер хвоста «повторная регистрация на тот же email»
+в `test_register_and_verify_email_e2e`.
 
 Дефолты совпадают с CI / ручным прогоном полного ТК. Переопределение — только через env при необходимости.
 """
 
 import os
+import time
+
+from playwright.sync_api import Page
 
 # Совпадают с прежними рекомендациями в README / integration.yml (дублировать в workflow не обязательно).
 DEFAULT_SAME_EMAIL_MAX_WAIT_SECONDS = 120
@@ -49,3 +53,23 @@ def same_email_retry_poll_interval_seconds() -> float:
         except ValueError:
             v = DEFAULT_POLL_INTERVAL_SECONDS
     return min(POLL_CLAMP_MAX, max(POLL_CLAMP_MIN, v))
+
+
+def wait_same_email_cooldown(page: Page, total_s: int, poll_s: float) -> None:
+    """Ждём limited_period без повторных submit: нарезка sleep на poll_s (один submit — только после паузы).
+
+    Раньше жила как приватная функция `_wait_same_email_cooldown` прямо в тесте
+    `test_register_and_verify_email_e2e` — вынесена сюда, рядом с остальными
+    настройками того же ретрая.
+
+    Повторные «Зарегистрироваться» давали гонку: бэкенд уже создал пользователя,
+    UI остался на /auth/register, следующий submit — «Пользователь уже существует».
+    """
+    if total_s <= 0:
+        return
+    deadline = time.monotonic() + float(total_s)
+    while time.monotonic() < deadline:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            break
+        page.wait_for_timeout(int(min(poll_s, remaining) * 1000))

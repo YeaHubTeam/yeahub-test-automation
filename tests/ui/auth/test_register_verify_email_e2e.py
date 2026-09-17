@@ -25,24 +25,9 @@ from tests.ui.flows.register_mail_interview_flow import (
 from tests.ui.flows.same_email_retry_config import (
     same_email_retry_max_wait_seconds,
     same_email_retry_poll_interval_seconds,
+    wait_same_email_cooldown,
 )
 from utils.data_generator import DataGenerator
-
-
-def _wait_same_email_cooldown(page: Page, total_s: int, poll_s: float) -> None:
-    """Ждём limited_period без повторных submit: нарезка sleep на poll_s (один submit — только после паузы).
-
-    Повторные «Зарегистрироваться» давали гонку: бэкенд уже создал пользователя, UI остался на /auth/register,
-    следующий submit — «Пользователь уже существует».
-    """
-    if total_s <= 0:
-        return
-    deadline = time.monotonic() + float(total_s)
-    while time.monotonic() < deadline:
-        remaining = deadline - time.monotonic()
-        if remaining <= 0:
-            break
-        page.wait_for_timeout(int(min(poll_s, remaining) * 1000))
 
 
 @pytest.mark.ui
@@ -139,7 +124,7 @@ def test_register_and_verify_email_e2e(page: Page, api_manager: ApiManager):
                     register_page.submit_registration()
         else:
             with allure.step("Same email re-register: blind wait then one submit (no submit loop)"):
-                _wait_same_email_cooldown(page, same_email_retry_max_s, same_email_poll_s)
+                wait_same_email_cooldown(page, same_email_retry_max_s, same_email_poll_s)
                 register_page.submit_registration()
         with allure.step("Assert register succeeded and cleanup second user via API"):
             register_page.wait_after_successful_register()

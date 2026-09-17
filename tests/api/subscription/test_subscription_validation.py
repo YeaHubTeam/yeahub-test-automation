@@ -1,7 +1,7 @@
 import allure
 import pytest
 
-from models.Subscriptions.model_subscription import ModelSubscriptionResponse
+from models.Subscriptions.model_subscription import Subscription
 from payloads.subscription_rates import TarifList
 from utils.helpers import DataUtils
 
@@ -17,9 +17,7 @@ class TestSubscriptionValidation:
     @allure.title("Получение списка подписок")
     def test_get_list_subscriptions(self, get_list_subscriptions):
         with allure.step("Pydantic-валидация списка подписок"):
-            validated = DataUtils.type_adapter(
-                list[ModelSubscriptionResponse], get_list_subscriptions
-            )
+            validated = DataUtils.type_adapter(list[Subscription], get_list_subscriptions)
 
         with allure.step("Проверка, что список подписок не пуст"):
             assert validated, "Список подписок пуст"

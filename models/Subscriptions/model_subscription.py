@@ -1,32 +1,23 @@
 from pydantic import Field
 
 from models.base_model import BaseResponse
+from models.role_model import Role
 
 
-class ModelSubscriptionResponse(BaseResponse):
+class Subscription(BaseResponse):
     """
     Класс для валидации данных подписки приходящих от сервера
     """
 
     id: int = Field(..., description="ID подписки")
-    name: str = Field(..., description="Навзвание подписки")
+    name: str = Field(..., description="Название подписки")
     code: str = Field(..., description="Период оплаты")
-    isActive: bool = Field(..., description="Активна ли подписка")
-    pricePerMonth: int = Field(..., description="Цена в месяц")
+    is_active: bool = Field(..., description="Активна ли подписка")
+    price_per_month: int = Field(..., description="Цена в месяц")
     discount: int = Field(..., description="Скидка")
-    monthPeriod: int = Field(..., description="Цена в месяц")
+    month_period: int = Field(..., description="Период в месяцах")
     description: str | None = Field(default=None, description="Описание подписки")
-    promo: str | None = Field(default=None, description="промо к подписке")
-    parentId: int | None = Field(default=None, description="ID Родителя")
-    roles: list[RoleModel] = Field(..., description="Описание роли")
-    finalPrice: int = Field(..., description="Финальная цена")
-
-
-class RoleModel(BaseResponse):
-    """
-    Вспомогательный класс для поля role
-    """
-
-    id: int
-    name: str
-    permissions: list[dict]
+    promo: str | None = Field(default=None, description="Промо к подписке")
+    parent_id: int | None = Field(default=None, description="ID родителя")
+    roles: list[Role] = Field(..., description="Роли подписки")
+    final_price: int | None = Field(default=None, description="Финальная цена")

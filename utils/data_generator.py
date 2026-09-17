@@ -13,6 +13,14 @@ class DataGenerator:
         return faker.name()
 
     @staticmethod
+    def random_password_excluding(*excluded: str) -> str:
+        """Пароль, гарантированно отличный от переданных — для тестов смены пароля."""
+        password = DataGenerator.random_password()
+        while password in excluded:
+            password = DataGenerator.random_password()
+        return password
+
+    @staticmethod
     def random_password():
         """Пароль для UI/API: длина и набор символов без «спорных» знаков (^| и т.п.)."""
         lower = random.choice(string.ascii_lowercase)

@@ -43,22 +43,17 @@ class ChangePasswordPage:
         return self.page.get_by_role("button", name=re.compile(r"^Сохранить$|^Save$", re.I)).first
 
     def _clear_onboarding_blocking_settings(self) -> None:
-        """Снять онбординг, если он перекрывает settings (часто застревает на 2/5 — специализация)."""
+        """Снять онбординг, если он перекрывает settings (часто застревает на 2/5 — специализация).
+
+        Быстрый путь — Escape; если модалка не отпускает — полный проход через
+        complete_onboarding_through_close(), который уже сам умеет пройти шаг 1
+        (Продолжить), выбрать специализацию в dropdown, шаг 3 (Продолжить) и «Позже» —
+        раньше это вручную повторялось здесь же вторым набором веток.
+        """
         onboarding = OnboardingModal(self.page)
         if not onboarding.modal.is_visible(timeout=1_500):
             return
         if onboarding.try_dismiss_with_escape(presses=5):
-            return
-        progress_1 = onboarding.modal.get_by_text(re.compile(r"1\s*/\s*5|1\s+of\s+5", re.I)).first
-        if progress_1.is_visible(timeout=2_000) and onboarding.continue_btn.is_visible(
-            timeout=2_000
-        ):
-            onboarding.click_continue()
-        if onboarding.modal.get_by_test_id("dropdown-select").is_visible(timeout=3_000):
-            try:
-                onboarding.complete_tc_steps_2_through_7()
-            except AssertionError:
-                pass
             return
         try:
             onboarding.complete_onboarding_through_close()

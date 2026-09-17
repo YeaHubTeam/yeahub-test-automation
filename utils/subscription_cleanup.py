@@ -3,7 +3,7 @@
 import time
 
 from constants.constants import NAME_SUBSCRIPTIONS
-from models.Subscriptions.model_user_subsriptions import UserSubscriptionResponse
+from models.Subscriptions.model_user_subscriptions import UserSubscriptionResponse
 from utils.helpers import DataUtils
 
 _BLOCKING_SUBSCRIPTION_STATES = frozenset({"pending_payment", "active"})

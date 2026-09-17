@@ -1,9 +1,9 @@
 from models.base_model import BaseResponse
-from models.Subscriptions.model_subscription import ModelSubscriptionResponse
+from models.Subscriptions.model_subscription import Subscription
 
 
 class TarifList(BaseResponse):
-    tarifs: list[ModelSubscriptionResponse]
+    tarifs: list[Subscription]
 
     @staticmethod
     def base_tarif() -> TarifList:
