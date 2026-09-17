@@ -1,164 +1,97 @@
-# AGENTS.md - YeaHub Test Automation
+# AI instructions: YeaHub Test Automation
 
-Version: 1.2
-Last updated: 2026-06-28
-Language: English (authoritative)
+Shared instructions for Python API and UI test automation in this repository. The main workflow is to turn a supplied manual test case into an automated test.
+This file is the single source of shared AI instructions. Tool-specific files reference it.
+Respond in the user's language. Follow the project's conventions for code and identifiers.
 
-If English and Russian documents differ, this English file is the source of truth.
+## Before making changes
 
-## 1) Mission
-This repository contains automated tests for YeaHub (API and UI).
-Primary goals:
-- reliable and stable test runs
-- clear and maintainable test code
-- fast and predictable PR feedback
+- Read the task, relevant README sections, configuration, and nearby tests. Before changing shared code, find its callers and read the setup and teardown of affected fixtures.
+- For a non-trivial task, briefly state the expected outcome, affected files, and validation plan. Ask about ambiguities that change the contract or scope; resolve routine details using existing examples.
+- A request to implement a change authorizes the necessary edits within that scope. Review, explanation, and research requests do not authorize project edits. Do not change these instructions without an explicit user request.
+- Do not invent APIs, response fields, locators, dependencies, TestIT IDs, or requirements. Verify them against the code, contract, or official documentation for the installed version. Point out conflicting sources.
 
-## 2) Tech Stack (Source of Truth)
-- Python: `>=3.14,<3.15`
-- Test framework: `pytest`
-- API: `requests`, `pydantic`
-- UI: `pytest-playwright`
-- Reporting: `allure-pytest`
-- Lint/format: `ruff`, `pre-commit`
+## When given a manual test case
 
-## 3) AI Agent Working Agreement
-When implementing tasks, always:
-1. Follow existing project patterns (fixtures, api manager, models, utils).
-2. Keep the diff minimal and focused on the task.
-3. Avoid adding dependencies unless strictly needed and justified.
-4. Run relevant checks first on target scope, then broader if needed.
-5. Follow DRY, KISS, PEP 8, and single responsibility.
-6. Add or update tests for important code paths and regressions.
-7. Prefer deterministic checks over flaky waits.
-8. Before changing shared helpers (`tests/mail/`, `conftest.py`, page objects used by multiple suites), **trace all callers** and edge cases (last retry attempt, missing env, teardown).
-9. When a fixture or helper gains new **external prerequisites** (IMAP, live API, secrets), use **`pytest.skip` / `skipif` with a clear reason** for integration tests—not a bare `assert` in setup unless the test is explicitly unit-only.
-10. Document **breaking changes** to fixture contracts or env requirements in `README.md` (CI Strategy + relevant test section), not only in PR text.
+- Treat the complete case as the task specification: ID, preconditions, user role, data, steps, expected results, and postconditions. Read the supplied text or accessible source in full. If a link is inaccessible or an image is unreadable, request the missing content instead of guessing.
+- Check whether the case supports unambiguous assertions. Clarify missing expected results or contradictions before implementing the dependent part. Investigate technical details already available in the project yourself.
+- Search for an existing automated test by case ID and scenario, along with suitable fixtures, clients, and page objects. Extend the existing implementation of the same case rather than creating a duplicate under a new name.
+- Before coding, briefly map significant steps and expected results to checks. For a long case, use a table: case step or result, automated action and assertion, setup or limitation. A click, API call, or absence of exceptions alone does not confirm the expected result.
+- Preserve the path under test. If the case checks UI registration, creating a user through the API does not replace that scenario. API setup and cleanup are appropriate when they are not the behavior being tested. Keep meaningful roles, statuses, tariffs, and boundary data consistent with the case.
+- Separate technical setup from tested actions. A logout or account deletion required by the case is not covered merely because a fixture deletes the user during teardown.
+- Do not mock the system whose behavior the manual end-to-end case checks. If only partial automation or a different test level is feasible, state its boundaries. Do not rewrite the manual case to fit the implementation without a user request.
+- Usually keep one coherent scenario in one test. Independent variants may be split or parameterized while retaining their link to the original case and coverage of its expected results.
+- For TestIT, obtain the manual case ID from the source and check the existing `externalId`. Follow project conventions for metadata and `workItemIds`; do not invent IDs of existing entities. A missing ID does not prevent local implementation, but the TestIT link must remain explicitly unverified.
+- In the result, identify the case and automated test, list covered expected results and remaining manual checks, and provide the exact run command and its actual outcome. Label incomplete coverage as partial automation. If the test was not run, state that the implementation is unverified.
 
-## 4) Git and Branching Rules
-Branch naming format:
-`<type>/<TRACKER-ID>-<short-description>`
+## Where to find current information
 
-Types:
-- `feature/` - new functionality or new tests
-- `fix/` - bug fixes
-- `refactor/` - refactoring
-- `docs/` - documentation
+- `pyproject.toml` and `uv.lock`: Python version, dependencies, pytest markers, and Ruff settings. Do not upgrade the stack as an unrelated change.
+- `README.md`: environment setup, CI Strategy, and pre-PR checks. `.env.example`: variable names without secrets.
+- `.github/workflows/ci.yml` and `.github/workflows/integration.yml`: actual CI commands and test selections.
+- `api/`, `custom_requester/`, and `models/`: API clients, transport, and models. `pages/`: UI actions and expectations.
+- Root and nested `conftest.py` files, `tests/mail/`, `tests/ui/flows/`, and `utils/`: fixtures, data preparation, retries, and cleanup.
 
-If no tracker task exists, use `YH-XXX` and request task creation from lead.
+Read the parts relevant to the task. If the README disagrees with configuration, verify actual behavior and correct the documentation affected by the task.
 
-Commit message format:
-`<TRACKER-ID>: <description in English>`
+## Write tests that detect failures
 
-Examples:
-- `YH-123: Add login API smoke tests`
-- `YH-456: Fix flaky login UI test`
+- Before writing a test, identify a concrete product defect that should make it fail. Derive expected results from requirements rather than copying the system's current response.
+- Keep one scenario per test. Multiple assertions are appropriate when they check that scenario's result. Separate setup, action, and assertions; parameterize variants with the same steps.
+- For APIs, check the status and meaningful data or state changes. Schema validation does not replace a business outcome check. For UI tests, assert the observable result of the action.
+- Do not weaken assertions, broaden accepted statuses, or remove checks just to make CI green. First distinguish a test defect from a product or environment failure.
+- Document known product defects with a task reference and a specific condition. If `xfail` is needed, keep strict behavior. Do not hide new failures behind `skip`, `xfail`, or broad exception handling.
+- For a regression in a shared helper, add a check of the real implementation. Where feasible, show it failing before the fix and passing afterward. Do not add tests merely to increase the count.
+- In unit tests, mock external boundaries such as HTTP, IMAP, and time. Do not mock the function under test or reimplement its logic inside the test. A mock should allow incorrect arguments or response handling to be detected.
+- Give every test an explicit type marker. Product tests need `api` or `ui`; live scenarios also need `integration`. Add the applicable priority: `smoke`, `critical`, or `regression`. Register new markers in configuration. Do not assign `pr_safe` without checking suitability for Fast CI.
 
-Before PR and before final merge:
-1. `git fetch origin`
-2. `git merge origin/master`
-3. Resolve conflicts if any
-4. Push branch updates
+## Isolation, fixtures, and waits
 
-## 5) PR Definition of Done
-Before opening PR, ensure:
-- linter passes
-- relevant tests pass locally
-- branch is updated with `origin/master`
-- new dependencies are pinned and documented
-- pytest marks are set correctly
-- new marks are registered in pytest config
+- Do not depend on test order, an existing user, or mail from a previous run. Create data for the scenario and delete only resources owned by that test.
+- Use explicit values for the conditions being checked. Generate unique emails and usernames with the project's shared generators; randomness must not change the meaning of the scenario.
+- Choose fixture scope to match the resource lifetime. Avoid sharing mutable state between tests unless necessary.
+- Handle cleanup after test failures and partially completed setup, including failures before `yield`. Close HTTP and IMAP sessions and other open resources. Cleanup errors must not obscure the original failure.
+- In Playwright, use stable locators and built-in `expect` assertions. Wait for a specific state with a bounded timeout instead of adding fixed sleeps.
+- Bound the total time spent polling external systems. Retry only transient errors; do not rerun an entire test just to obtain a passing result. Before retrying a write operation, check whether it could create duplicates.
+- Trace all callers before changing retries. Do not invoke a callback that prepares another attempt after the final failure. Do not stack independent retry loops without accounting for their total duration.
+- If an extra fetch only refines an already successful result, a transient failure must not discard that first result. Handle expected exceptions without hiding failure of a required step.
 
-PR description should include:
-- task link
-- short list of changes
-- how to validate (exact `pytest` command)
-- new or changed **env prerequisites** (`MAIL_*`, `RUN_MAIL_INTEGRATION`, secrets) when applicable
+## External services and CI results
 
-## 6) Pytest Marking Policy
-Required baseline:
-1. Every test must have an explicit test-type marker (for example: `api`, `ui`, `unit`, `integration`, `db`).
-2. Product API/UI tests must include a scope marker: `@pytest.mark.api` or `@pytest.mark.ui`.
-3. Every test should include a priority marker whenever applicable: `@pytest.mark.smoke` or `@pytest.mark.critical` or `@pytest.mark.regression`.
+- Local integration tests without required credentials should skip with an actionable reason before contacting the service. Use existing prerequisite checks.
+- A missing required secret for an explicitly selected CI scope must produce a clear configuration failure. Do not turn authentication errors or an unavailable configured service into a successful test.
+- Check `MAIL_*` for IMAP and verified-user fixtures. `RUN_MAIL_INTEGRATION=1` enables explicit mail and UI end-to-end tests; subscription API tests use `MAIL_*` without that flag. Confirm exact prerequisites in the README and the fixture being called.
+- Inspect imports and hooks before running commands: even `pytest --collect-only` executes Python code. Remember that `pr_safe` tests in this project may call a live API.
+- Do not run payments with real payment details or use other people's accounts. Keep secrets out of code, terminal output, logs, Allure attachments, and messages.
+- When changing CI or TestIT, check every affected manual and scheduled path, the selected tests, missing required variables, and repeat runs. Exit code 0 without the expected tests and results does not prove successful validation.
+- When changing reporting integration, verify delivery to the intended run. If TestIT is unavailable, state that only local behavior was checked. Preserve existing `externalId` values and manual case links unless changing them is part of the task.
 
-Optional markers when needed:
-- `slow`
-- `negative`
-- `integration`
-- `db`
-- `pr_safe`
-- `healthcheck`
+## Keep changes focused
 
-## 7) Test Design Standards
-- One test should validate one clear behavior.
-- Use clear Arrange / Act / Assert structure.
-- Keep setup and teardown in fixtures where possible.
-- Use explicit and reproducible test data.
-- Assertions should clearly explain failures.
-- For known backend bugs, keep TODO with tracker reference.
+- Reuse existing clients, page objects, and helpers. Extract shared code when it has clear responsibilities and real callers. Do not add speculative generic wrappers or base classes.
+- Use clear names and straightforward code. Add type hints where they clarify a contract. Comments should explain a reason or constraint rather than restating the code.
+- Avoid dependencies, bulk formatting, and unrelated fixes unless required by the task. Do not leave placeholders, commented-out code, or unused helpers.
+- Preserve other people's uncommitted changes. Do not commit, push, or publish comments without a user request. Destructive Git operations require explicit permission.
+- Name branches `<type>/<TRACKER-ID>-<description>` (`feature`, `fix`, `refactor`, or `docs`) and commits `<TRACKER-ID>: <English summary>`. If no ID is available, use `YH-XXX` and flag that a tracker task is needed. Before a PR or merge, update the branch with `git fetch origin` and `git merge origin/master`; do not substitute a force-push.
+- Document changes to environment requirements, fixture contracts, CI scopes, and TestIT links in the README. Add new variables to `.env.example` without secret values. Record dependencies in `pyproject.toml` and `uv.lock`.
 
-### Integration prerequisites (project-wide)
-- **Live mail / IMAP** (`MAIL_HOST`, `MAIL_EMAIL`, `MAIL_PASSWORD`, optional `MAIL_FOLDER`, `MAIL_PORT`): required for mail e2e, subscription/payment flows that provision verified users via IMAP, and related fixtures (`verified_registered_user`, `verified_subscription_user`, mail quartet in CI `scope=mail`).
-- **`RUN_MAIL_INTEGRATION=1`**: gates explicit live mail e2e tests (see mail/UI tests with `skipif`); subscription API integration in CI uses `MAIL_*` secrets without this flag.
-- **Skip vs fail**: if creds are missing locally, integration tests should **skip** with an actionable message (pattern: `tests/mail/test_mail_client_integration.py`, `require_mail_creds` + `skipif` where appropriate)—not fail mid-fixture with an opaque assert.
-- **CI**: Integration workflow secrets are documented in README CI Strategy; do not assume local `.env` matches CI.
+## Validate before finishing
 
-### Shared retry and polling helpers
-- **Retry callbacks** (`on_retry`, refresh identity): invoke only when `attempt < max_attempts - 1`. Do not regenerate users/emails/tags on the **last** failed attempt.
-- **Polling / settle-after-wait**: if a second fetch can fail (e.g. IMAP `find_message` after `wait_for_message`), wrap in `try/except` and **keep the first successful result** so the whole chain does not fail on a race.
-- After changing retry/polling logic, grep callers (`register_user_with_retries`, `wait_imap_verification_link`, fixtures in `conftest.py`).
+Run commands from the repository root. Check the changed scenario first, then callers of shared code. Take full live-suite commands from the README and workflows.
 
-## 8) Learning Mode (Team Growth)
-The AI agent should work as a senior mentor:
-- explain why changes are made, not only what changed
-- suggest a simpler alternative when a solution is too complex
-- highlight 1-2 practical industry best practices for significant tasks
-- avoid overengineering and long theoretical digressions
+```bash
+uv run ruff check .
+uv run ruff format . --check
+uv run pytest -m "unit or pr_safe"
+```
 
-## 9) Security and Stability Guardrails
-- Never commit secrets, tokens, or real credentials.
-- Use env variables and local `.env` workflow.
-- Never perform destructive git operations unless explicitly requested.
-- Never modify unrelated files.
+- The last command matches Fast CI and includes API calls. For available offline checks, use `uv run pytest -m unit` and explicitly report that the full Fast CI selection was not run.
+- For UI auth and interview changes, use the workflow's `run_ui_auth_smoke` selection. Onboarding changes also require checking the related mail-registration scenario when prerequisites are available.
+- For mail, subscription, and verified-user helpers, select the relevant API and UI suites from the README. Check the final retry attempt, missing environment variables, and cleanup after failure.
+- For documentation-only changes, check the diff, links, and command accuracy. Live tests are unnecessary without a related behavior change.
+- Review the final diff for task scope, weakened checks, and unrelated edits. Never report tests as passed if they were not run, were skipped, or were excluded by a filter.
 
-## 10) Communication Style
-- concise and practical responses
-- step-by-step commands when useful
-- checklist-oriented output for execution
-- focus on shipping reliable tests
+## Report the outcome
 
-## 11) Change Approval Policy
-- By default, do not modify files without explicit user approval.
-- First provide analysis and a proposed change plan (or diff summary), then ask for confirmation.
-- Apply changes only after a clear "yes" from the user.
-- Exception: tiny low-risk edits (up to 1-2 files) may be applied immediately only if the user explicitly asks to proceed directly.
-
-## 12) Task Intake (before coding)
-
-When starting a non-trivial task, clarify (with the user if needed):
-1. **Done means** — which tests/scopes must be green (Fast CI, Integration `scope=…`, local commands).
-2. **Prerequisites** — `MAIL_*`, `RUN_MAIL_INTEGRATION`, Playwright, secrets; what should **skip** vs **fail** without them.
-3. **Blast radius** — which fixtures, workflows, and README sections are affected.
-4. **Breaking changes** — e.g. replacing static creds with ephemeral/IMAP users; document in README.
-
-If the user did not specify, infer from the ticket and state assumptions before large diffs.
-
-## 13) Pre-commit / Pre-PR Checklist (Agent)
-
-Run this checklist when the user asks to **commit**, open a **PR**, or says the work is **ready to commit** (e.g. "готово к коммиту"), unless they explicitly skip checks.
-
-1. **Scope** — Inspect `git diff` / changed paths; list affected areas (ui-auth, mail, subscription, `pages/`, CI, docs).
-2. **Caller impact** — For changes in `tests/mail/`, `conftest.py`, shared `pages/`, or workflows: grep callers; check last-retry behavior and missing-env paths.
-3. **Lint** — `uv run ruff check .` and `uv run ruff format . --check` on touched paths (whole repo if the diff is small).
-4. **Tests** (minimal by area; see also README "Проверки перед PR"):
-   - UI auth / interview / `onboarding_modal` → same paths as `run_ui_auth_smoke` in `.github/workflows/integration.yml`.
-   - Changes to `onboarding_modal` or specialization → also mail `test_register_and_verify_email_e2e` when `RUN_MAIL_INTEGRATION=1` is feasible.
-   - Mail / IMAP helpers or TC 422/466/115/52 → `scope=mail` quartet or the subset documented in README.
-   - Subscription API/UI / `verified_*` fixtures → `tests/api/subscription/` and/or `tests/ui/subscription/` with `MAIL_*` as documented.
-   - Unit / `pr_safe` only → `pytest -m "unit or pr_safe"`.
-5. **Local without secrets** — When env-dependent: confirm tests **skip** with a clear reason (or document that mail is required); do not rely only on CI green.
-6. **Docs** — If CI scopes, test names, `externalId`, fixture contracts, or env vars changed → update `README.md` (CI Strategy + affected test section).
-7. **Lead-style self-review** — Before PR: retry semantics, skip vs assert, defensive fallbacks in helpers, README for new prerequisites, no unrelated diff.
-8. **Git** — Branch `type/TRACKER-id-description`; commit `TRACKER: English summary`; remind `git fetch origin` + `git merge origin/master` before PR.
-9. **Report** — Summarize pass/fail, commands run, and any skipped live runs. Do **not** `git commit` unless the user explicitly asked to commit.
-
-If live pytest cannot run in the agent environment (e.g. Playwright browsers missing), state that clearly and give the exact commands for the user to run locally.
+Briefly explain what changed and why. Give the commands actually run and their results; list limitations and unverified scenarios separately. One successful run is not proof of stability.
+For a significant change, explain one useful practice using the affected code. In reviews, identify the location, failure condition, consequence, smallest useful fix, and how to verify it. Discuss the code rather than the author's abilities.
