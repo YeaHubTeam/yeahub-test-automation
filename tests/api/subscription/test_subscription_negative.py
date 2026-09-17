@@ -5,7 +5,7 @@ import allure
 import pytest
 
 from constants.constants import NAME_SUBSCRIPTIONS
-from models.Subscriptions.model_user_subsriptions import ModelErrorResponse
+from models.error_model import ModelErrorResponse
 from utils.helpers import DataUtils
 
 pytestmark = [pytest.mark.api, pytest.mark.integration, pytest.mark.regression]

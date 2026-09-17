@@ -46,4 +46,4 @@ class TestLoginYeahub:
             assert response_data.user is not None, "Данные пользователя отсутствуют в ответе"
             assert response_data.user.email == test_user["email"], "Email не совпадает"
             assert response_data.user.id, "ID пользователя отсутствует"
-            assert response_data.user.userRoles is not None, "Роли пользователя отсутствуют"
+            assert response_data.user.user_roles is not None, "Роли пользователя отсутствуют"

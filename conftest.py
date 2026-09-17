@@ -7,7 +7,7 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
 from api.api_manager import ApiManager
-from models.Subscriptions.model_subscription import ModelSubscriptionResponse
+from models.Subscriptions.model_subscription import Subscription
 from tests.mail.signup_retry import authenticate_with_retries
 from tests.mail.verified_user import provision_verified_mail_user, yield_payment_link_subscriptions
 from utils.data_generator import DataGenerator
@@ -125,7 +125,7 @@ def get_list_subscriptions(api_manager):
     assert last_response.status_code == 200, "subscriptions list is unavailable (503) after retries"
 
     response_json = last_response.json()
-    return DataUtils.type_adapter(list[ModelSubscriptionResponse], response_json)
+    return DataUtils.type_adapter(list[Subscription], response_json)
 
 
 @pytest.fixture(scope="function")

@@ -9,10 +9,8 @@ from pytest_check import check
 
 from constants.constants import NAME_SUBSCRIPTIONS, PAYMENT_SUBSCRIPTIONS_URL
 from constants.currency_code import CurrencyCode
-from models.Subscriptions.model_user_subsriptions import (
-    ModelErrorResponse,
-    UserSubscriptionResponse,
-)
+from models.error_model import ModelErrorResponse
+from models.Subscriptions.model_user_subscriptions import UserSubscriptionResponse
 from payloads.subscription_rates import TarifList
 from utils.helpers import DataUtils
 
@@ -53,7 +51,7 @@ class TestSubscriptionPositive:
             price_tarif = DataUtils.find_item(
                 items=TarifList.base_tarif().tarifs,
                 condition=lambda tarif: tarif.name == NAME_SUBSCRIPTIONS,
-                transform=lambda tarif: int(tarif.finalPrice) * 100,
+                transform=lambda tarif: int(tarif.final_price) * 100,
             )
 
         with allure.step("Извлечение уникального ID для оплаты"):

@@ -37,9 +37,7 @@ def test_change_password_settings_desktop(page: Page, registered_user: dict[str,
     email = registered_user["email"]
     current_password = registered_user["password"]
     username = registered_user["username"]
-    new_password = DataGenerator.random_password()
-    while new_password == current_password:
-        new_password = DataGenerator.random_password()
+    new_password = DataGenerator.random_password_excluding(current_password)
 
     with allure.step("Предусловие: UI-вход в личный кабинет"):
         login_page = LoginPage(page)

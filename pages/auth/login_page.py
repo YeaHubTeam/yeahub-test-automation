@@ -43,6 +43,37 @@ class LoginPage:
         expect(toggle).to_be_visible(timeout=10_000)
         expect(toggle.locator("svg")).to_be_visible(timeout=5_000)
 
+    def _forgot_password_link(self):
+        """Общий локатор «Забыли пароль?» — используется и в проверке формы, и в клике по ссылке.
+
+        Раньше эта же цепочка `.or_()` была продублирована один в один в двух методах
+        (expect_login_form_elements_visible и click_forgot_password).
+        """
+        return (
+            self.page.locator('a[data-testid="Button"]')
+            .filter(has_text=re.compile(r"забыли[\s\u00a0]*парол", re.I))
+            .first.or_(
+                self.page.get_by_role(
+                    "link", name=re.compile(r"забыли.*парол|forgot.*password", re.I)
+                )
+            )
+            .or_(
+                self.page.locator('a[href*="forgot"], a[href*="password"], a[href*="reset"]').first
+            )
+        )
+
+    def _signup_link(self):
+        return (
+            self.page.locator('a[data-testid="Button"]')
+            .filter(has_text=re.compile(r"зарегистрир", re.I))
+            .first.or_(
+                self.page.get_by_role(
+                    "link", name=re.compile(r"зарегистрир|sign\s*up|register", re.I)
+                )
+            )
+            .or_(self.page.locator('a[href*="/auth/register"], a[href*="register"]').first)
+        )
+
     def expect_login_form_elements_visible(self) -> None:
         """Ручной ТК 409, шаг 1: состав формы (без кнопки Telegram — вне объёма проверки)."""
         expect(
@@ -65,35 +96,11 @@ class LoginPage:
 
         self._expect_password_visibility_toggle_visible()
 
-        # «Забыли пароль?» — `<a data-testid="Button">` (на форме несколько `Button` — фильтр по тексту).
-        forgot_pw = (
-            self.page.locator('a[data-testid="Button"]')
-            .filter(has_text=re.compile(r"забыли[\s\u00a0]*парол", re.I))
-            .first.or_(
-                self.page.get_by_role(
-                    "link", name=re.compile(r"забыли.*парол|forgot.*password", re.I)
-                )
-            )
-            .or_(
-                self.page.locator('a[href*="forgot"], a[href*="password"], a[href*="reset"]').first
-            )
-        )
-        expect(forgot_pw.first).to_be_visible(timeout=10_000)
+        expect(self._forgot_password_link().first).to_be_visible(timeout=10_000)
         expect(
             self.page.get_by_role("button", name=re.compile(r"^Вход$|^Войти$", re.I))
         ).to_be_visible(timeout=10_000)
-        # «Зарегистрироваться» — часто тот же паттерн, что «Забыли пароль?»: `<a data-testid="Button">`.
-        signup = (
-            self.page.locator('a[data-testid="Button"]')
-            .filter(has_text=re.compile(r"зарегистрир", re.I))
-            .first.or_(
-                self.page.get_by_role(
-                    "link", name=re.compile(r"зарегистрир|sign\s*up|register", re.I)
-                )
-            )
-            .or_(self.page.locator('a[href*="/auth/register"], a[href*="register"]').first)
-        )
-        expect(signup.first).to_be_visible(timeout=10_000)
+        expect(self._signup_link().first).to_be_visible(timeout=10_000)
 
     def expect_no_login_validation_errors(self) -> None:
         """Нет явной клиентской ошибки у полей (HTML5 / подписи под полем)."""
@@ -117,8 +124,8 @@ class LoginPage:
         last_status: int | None = None
         for attempt in range(max_attempts):
             with self.page.expect_response(
-                lambda r: "/auth/login" in r.url and r.request.method == "POST",
-                timeout=45_000,
+                    lambda r: "/auth/login" in r.url and r.request.method == "POST",
+                    timeout=45_000,
             ) as resp_info:
                 self.submit()
             last_status = resp_info.value.status
@@ -144,8 +151,8 @@ class LoginPage:
     def submit_expecting_unauthorized(self) -> None:
         """ТК 117 шаг 7: login удалённого пользователя → HTTP 401/403, остаёмся на /auth/login."""
         with self.page.expect_response(
-            lambda r: "/auth/login" in r.url and r.request.method == "POST",
-            timeout=20_000,
+                lambda r: "/auth/login" in r.url and r.request.method == "POST",
+                timeout=20_000,
         ) as resp_info:
             self.submit()
         status = resp_info.value.status
@@ -176,18 +183,7 @@ class LoginPage:
 
     def click_forgot_password(self) -> None:
         """Шаг 2 ТК 115: «Забыли пароль?» → /auth/forgot-password."""
-        forgot_pw = (
-            self.page.locator('a[data-testid="Button"]')
-            .filter(has_text=re.compile(r"забыли[\s\u00a0]*парол", re.I))
-            .first.or_(
-                self.page.get_by_role(
-                    "link", name=re.compile(r"забыли.*парол|forgot.*password", re.I)
-                )
-            )
-            .or_(
-                self.page.locator('a[href*="forgot"], a[href*="password"], a[href*="reset"]').first
-            )
-        )
+        forgot_pw = self._forgot_password_link()
         forgot_pw.first.click()
         expect(self.page).to_have_url(re.compile(r".*/auth/forgot-password", re.I), timeout=20_000)
 

@@ -1,9 +1,9 @@
 import datetime
-from typing import List, Optional
 
-from pydantic import ConfigDict, EmailStr, Field, HttpUrl, field_validator
+from pydantic import EmailStr, Field, HttpUrl
 
 from models.base_model import BaseResponse
+from models.role_model import Role
 
 
 class TestUser(BaseResponse):
@@ -17,78 +17,83 @@ class TestUser(BaseResponse):
     city: str
     birthday: datetime.date
     address: str
-    avatarUrl: HttpUrl
-    refId: Optional[str] = None
-
-
-class Permission(BaseResponse):
-    id: int
-    name: str
-
-
-class UserRole(BaseResponse):
-    id: int
-    name: str
-    permissions: List[Permission]
+    avatar_url: HttpUrl
+    ref_id: str | None = None
 
 
 class Profiles(BaseResponse):
     id: str
-    profileType: int
-    specializationId: Optional[int] = None
-    markingWeight: int
-    description: Optional[str] = None
-    socialNetwork: Optional[str] = None
-    image_src: Optional[str] = None
-    isActive: Optional[bool] = None
-    profileSkills: Optional[list] = None
-    ratingPoints: Optional[int] = None
+    profile_type: int
+    specialization_id: int | None = None
+    marking_weight: int
+    description: str | None = None
+    social_network: str | None = None
+    image_src: str | None = None
+    is_active: bool | None = None
+    profile_skills: list | None = None
+    rating_points: int | None = None
 
 
-class UserResponse(BaseResponse):
-    """Модель валидации ответа созданного пользователя"""
+class UserCoreFields(BaseResponse):
+    """
+    Общие поля пользователя, единые для всех auth/profile-эндпоинтов.
+    Конкретные эндпоинты дополняют или сужают этот набор в сабклассах ниже —
+    см. таблицу отличий по контрактам в комментариях к каждому классу.
+    """
 
     id: str
     username: str
-    phone: str
-    country: str
-    city: str
     email: EmailStr
-    birthday: datetime.date
-    address: str
-    avatarUrl: Optional[str] = None
-    telegramUsername: Optional[str] = None
-    createdAt: datetime.datetime = Field(alias="createdAt")
-    updatedAt: datetime.datetime = Field(alias="updatedAt")
-    userRoles: Optional[List[UserRole]] = None
-    isVerified: Optional[bool] = None
-    isEmailNotificationsEnable: Optional[bool] = None
-    profiles: Optional[List[Profiles]] = None
-    subscriptions: Optional[list] = None
+    phone: str | None = None
+    country: str | None = None
+    city: str | None = None
+    birthday: datetime.date | None = None
+    address: str | None = None
+    avatar_url: str | None = None
+    telegram_username: str | None = None
+    created_at: datetime.datetime
+    updated_at: datetime.datetime
+    is_email_notifications_enable: bool | None = None
 
 
-class CreatedUserResponse(BaseResponse):
+class SignUpUserResponse(UserCoreFields):
+    """
+    Ответ на POST /auth/signUp.
+    Сервер на этом этапе ещё не назначает роли и verified-статус,
+    поэтому в отличие от остальных вариантов их тут нет.
+    """
+
+
+class LoginUserResponse(UserCoreFields):
+    """Ответ на POST /auth/login"""
+
+    user_roles: list[Role]
+    is_verified: bool
+
+
+class BaseRefreshTokenResponse(UserCoreFields):
+    """Ответ на GET /auth/refresh"""
+
+    user_roles: list[Role]
+    is_verified: bool
+
+
+class UserResponse(UserCoreFields):
+    """
+    Ответ на GET /auth/profile.
+    Самый полный контракт — включает профили и подписки, которых нет
+    в других auth-ответах.
+    """
+
+    user_roles: list[Role] | None = Field(default=None)
+    is_verified: bool | None = None
+    profiles: list[Profiles] | None = None
+    subscriptions: list | None = None
+
+
+class SignUpResponse(BaseResponse):
     access_token: str
-    user: UserResponse
-
-
-class LoginUserResponse(BaseResponse):
-    id: str
-    username: str
-    email: EmailStr
-    phone: str
-    updatedAt: datetime.datetime
-    createdAt: datetime.datetime
-    userRoles: List[UserRole]
-    isVerified: bool
-    isEmailNotificationsEnable: bool
-
-    country: Optional[str] = None
-    city: Optional[str] = None
-    birthday: Optional[datetime.datetime] = None
-    address: Optional[str] = None
-    avatarUrl: Optional[str] = None
-    telegramUsername: Optional[str] = None
+    user: SignUpUserResponse
 
 
 class LoginResponse(BaseResponse):
@@ -96,23 +101,10 @@ class LoginResponse(BaseResponse):
     user: LoginUserResponse
 
 
-class SignUpUserResponse(BaseResponse):
-    id: str
-    username: str
-    email: EmailStr
-    phone: str
-    updatedAt: datetime.datetime
-    createdAt: datetime.datetime
-    isEmailNotificationsEnable: bool
-
-    country: Optional[str] = None
-    city: Optional[str] = None
-    birthday: Optional[datetime.datetime] = None
-    address: Optional[str] = None
-    avatarUrl: Optional[str] = None
-    telegramUsername: Optional[str] = None
-
-
-class SignUpResponse(BaseResponse):
+class RefreshTokenResponse(BaseResponse):
     access_token: str
-    user: SignUpUserResponse
+    user: BaseRefreshTokenResponse
+
+# NOTE: CreatedUserResponse (access_token + UserResponse) удалена как неиспользуемый
+# дубль SignUpResponse — вызовов вне объявления класса не найдено. Если найдётся
+# реальный usage — восстановить и разобраться, какой эндпоинт она валидирует.

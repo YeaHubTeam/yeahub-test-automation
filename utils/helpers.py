@@ -2,7 +2,7 @@ from typing import List
 
 from pydantic import TypeAdapter
 
-from models.Subscriptions.model_user_subsriptions import UserSubscriptionResponse
+from models.Subscriptions.model_user_subscriptions import UserSubscriptionResponse
 
 
 class DataUtils:
