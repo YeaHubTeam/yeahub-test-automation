@@ -23,7 +23,7 @@ _EMAIL_RATE_LIMIT_RE = re.compile(
 
 
 def send_verification_email_with_retries(
-        api_manager: ApiManager, user_id, deadline_s: float = 180.0
+    api_manager: ApiManager, user_id, deadline_s: float = 180.0
 ):
     """Триггерит письмо; при 403 (rate limit) ждёт и повторяет (как в API e2e)."""
     deadline = time.time() + deadline_s

@@ -17,9 +17,7 @@ class TestSubscriptionValidation:
     @allure.title("Получение списка подписок")
     def test_get_list_subscriptions(self, get_list_subscriptions):
         with allure.step("Pydantic-валидация списка подписок"):
-            validated = DataUtils.type_adapter(
-                list[Subscription], get_list_subscriptions
-            )
+            validated = DataUtils.type_adapter(list[Subscription], get_list_subscriptions)
 
         with allure.step("Проверка, что список подписок не пуст"):
             assert validated, "Список подписок пуст"

@@ -109,7 +109,7 @@ def test_register_and_verify_email_e2e(page: Page, api_manager: ApiManager):
         if same_email_signup_api_probe_enabled():
             signup_payload = build_signup_payload_for_api(username2, recipient_email, password2)
             with allure.step(
-                    "Same email re-register: wait until backend cooldown passes (API probe)"
+                "Same email re-register: wait until backend cooldown passes (API probe)"
             ):
                 token = wait_same_email_signup_ready_via_api_probe(
                     api_manager,

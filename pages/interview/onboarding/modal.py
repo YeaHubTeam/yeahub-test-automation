@@ -154,11 +154,11 @@ class OnboardingModal:
     def _ensure_onboarding_dismissed(self) -> None:
         """Финальный проход: Escape / close CTA / длинный timeout."""
         if self.modal.is_visible(timeout=2_000) or self.page.get_by_role(
-                "heading", name="Onboarding"
+            "heading", name="Onboarding"
         ).is_visible(timeout=1_000):
             self.try_dismiss_with_escape(presses=5)
         if self.modal.is_visible(timeout=1_000) or self.page.get_by_role(
-                "heading", name="Onboarding"
+            "heading", name="Onboarding"
         ).is_visible(timeout=1_000):
             self.close_onboarding_modal()
         self.expect_onboarding_dismissed(timeout_ms=45_000)

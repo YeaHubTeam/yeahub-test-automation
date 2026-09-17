@@ -24,9 +24,9 @@ def clear_authorization_headers(api_manager: ApiManager) -> None:
 
 
 def apply_authorization_headers(
-        api_manager: ApiManager,
-        session_auth: str | None,
-        api_auth: str | None,
+    api_manager: ApiManager,
+    session_auth: str | None,
+    api_auth: str | None,
 ) -> None:
     if session_auth:
         api_manager.session.headers["Authorization"] = session_auth

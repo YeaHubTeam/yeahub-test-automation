@@ -6,7 +6,10 @@ from datetime import datetime
 
 from api.api_manager import ApiManager
 from mail.exceptions import MessageNotFoundError
-from tests.mail.verification.actions import confirm_email_via_link, send_verification_email_with_retries
+from tests.mail.verification.actions import (
+    confirm_email_via_link,
+    send_verification_email_with_retries,
+)
 from tests.mail.verification.asserts import assert_profile_not_verified, assert_profile_verified
 from tests.mail.verification.polling import wait_imap_verification_link
 
@@ -31,14 +34,14 @@ def build_signup_payload_for_api(username: str, email: str, password: str) -> di
 
 
 def verify_api_registered_user_email(
-        api_manager: ApiManager,
-        *,
-        email: str,
-        password: str,
-        user_id: str,
-        started_at: datetime,
-        imap_first_timeout_s: float = 20.0,
-        imap_after_resend_timeout_s: float = 120.0,
+    api_manager: ApiManager,
+    *,
+    email: str,
+    password: str,
+    user_id: str,
+    started_at: datetime,
+    imap_first_timeout_s: float = 20.0,
+    imap_after_resend_timeout_s: float = 120.0,
 ) -> None:
     """После POST /auth/signUp: IMAP (письмо могло уйти на signUp) → иначе send → IMAP → confirm."""
     assert_profile_not_verified(api_manager, email, password)

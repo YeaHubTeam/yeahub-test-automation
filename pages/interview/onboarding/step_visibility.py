@@ -22,9 +22,7 @@ class StepVisibility:
 
     def expect_progress_fraction(self, current: int, total: int = 5) -> None:
         """Этап n/m на прогресс-баре онбординга (допускаем пробелы вокруг «/»)."""
-        expect(
-            self._loc.modal.get_by_text(re.compile(rf"{current}\s*/\s*{total}"))
-        ).to_be_visible()
+        expect(self._loc.modal.get_by_text(re.compile(rf"{current}\s*/\s*{total}"))).to_be_visible()
 
     def expect_second_step_visible(self):
         """Шаг 2: якорь `dropdown-select`; заголовок — «Выбери свою специализацию» (не role=heading).

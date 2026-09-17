@@ -29,9 +29,7 @@ class ModalDismissal:
         return modal_gone and heading_gone
 
     def expect_dismissed(self, timeout_ms: int = 30_000) -> None:
-        expect(self.page.get_by_role("heading", name="Onboarding")).to_be_hidden(
-            timeout=timeout_ms
-        )
+        expect(self.page.get_by_role("heading", name="Onboarding")).to_be_hidden(timeout=timeout_ms)
         expect(self._loc.modal).to_be_hidden(timeout=5_000)
 
     def _try_click(self, locator, *, visibility_timeout_ms: int = 2_000) -> bool:
@@ -71,9 +69,9 @@ class ModalDismissal:
         if self.is_dismissed(timeout_ms=1_000):
             return
         for strategy in (
-                self.try_close_icon,
-                self.try_named_dismiss_button,
-                self.try_primary_button,
+            self.try_close_icon,
+            self.try_named_dismiss_button,
+            self.try_primary_button,
         ):
             if strategy():
                 return

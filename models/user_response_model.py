@@ -105,6 +105,7 @@ class RefreshTokenResponse(BaseResponse):
     access_token: str
     user: BaseRefreshTokenResponse
 
+
 # NOTE: CreatedUserResponse (access_token + UserResponse) удалена как неиспользуемый
 # дубль SignUpResponse — вызовов вне объявления класса не найдено. Если найдётся
 # реальный usage — восстановить и разобраться, какой эндпоинт она валидирует.

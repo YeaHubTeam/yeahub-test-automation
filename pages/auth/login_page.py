@@ -124,8 +124,8 @@ class LoginPage:
         last_status: int | None = None
         for attempt in range(max_attempts):
             with self.page.expect_response(
-                    lambda r: "/auth/login" in r.url and r.request.method == "POST",
-                    timeout=45_000,
+                lambda r: "/auth/login" in r.url and r.request.method == "POST",
+                timeout=45_000,
             ) as resp_info:
                 self.submit()
             last_status = resp_info.value.status
@@ -151,8 +151,8 @@ class LoginPage:
     def submit_expecting_unauthorized(self) -> None:
         """ТК 117 шаг 7: login удалённого пользователя → HTTP 401/403, остаёмся на /auth/login."""
         with self.page.expect_response(
-                lambda r: "/auth/login" in r.url and r.request.method == "POST",
-                timeout=20_000,
+            lambda r: "/auth/login" in r.url and r.request.method == "POST",
+            timeout=20_000,
         ) as resp_info:
             self.submit()
         status = resp_info.value.status

@@ -13,15 +13,14 @@
 TODO: завести тикет на восстановление iOS-покрытия forgot-password и вписать сюда номер.
 """
 
+from datetime import datetime, timezone
+
 import allure
 import pytest
 
-from datetime import datetime, timezone
-
 from api.api_manager import ApiManager
-from utils.data_generator import DataGenerator
-
 from tests.mail.reset_password_flow import wait_imap_reset_password_link_after_ui_send
+from utils.data_generator import DataGenerator
 
 pytestmark = pytest.mark.skip(
     reason=(
@@ -42,9 +41,9 @@ pytestmark = pytest.mark.skip(
 @allure.title("Восстановление пароля через письмо (iOS)")
 @allure.severity(allure.severity_level.CRITICAL)
 def test_forgot_password_recovery_ios(
-        driver,
-        api_manager: ApiManager,
-        verified_registered_user: dict,
+    driver,
+    api_manager: ApiManager,
+    verified_registered_user: dict,
 ):
     email = verified_registered_user["email"]
     username = verified_registered_user["username"]

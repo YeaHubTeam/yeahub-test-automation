@@ -10,11 +10,10 @@ import json
 import time
 from datetime import datetime
 
+from api.api_manager import ApiManager
 from mail.exceptions import MessageNotFoundError
 from mail.mail_client import MailClient
 from resources.mail_creds import MailCreds
-
-from api.api_manager import ApiManager
 from tests.mail.signup_retry import authenticate_with_retries
 from tests.mail.verification.actions import send_verification_email_with_retries
 from tests.mail.verification.asserts import assert_profile_verified, profile_is_verified
@@ -22,13 +21,13 @@ from tests.mail.verification.session_context import anonymous_session
 
 
 def wait_imap_verification_link(
-        *,
-        recipient_email: str,
-        since: datetime,
-        min_date: datetime | None = None,
-        timeout_s: float = 180.0,
-        poll_interval_s: float = 3.0,
-        settle_s: float = 5.0,
+    *,
+    recipient_email: str,
+    since: datetime,
+    min_date: datetime | None = None,
+    timeout_s: float = 180.0,
+    poll_interval_s: float = 3.0,
+    settle_s: float = 5.0,
 ) -> str:
     client = MailClient(
         host=MailCreds.HOST,
@@ -62,16 +61,16 @@ def wait_imap_verification_link(
 
 
 def wait_imap_verification_link_or_resend(
-        api_manager: ApiManager,
-        *,
-        user_id: str,
-        recipient_email: str,
-        since: datetime,
-        min_date: datetime | None = None,
-        imap_first_timeout_s: float = 90.0,
-        imap_after_resend_timeout_s: float = 180.0,
-        poll_interval_s: float = 3.0,
-        settle_s: float = 5.0,
+    api_manager: ApiManager,
+    *,
+    user_id: str,
+    recipient_email: str,
+    since: datetime,
+    min_date: datetime | None = None,
+    imap_first_timeout_s: float = 90.0,
+    imap_after_resend_timeout_s: float = 180.0,
+    poll_interval_s: float = 3.0,
+    settle_s: float = 5.0,
 ) -> str:
     """Сначала ждём письмо; если не пришло за imap_first_timeout_s — резенд и снова ждём."""
     try:
@@ -96,12 +95,12 @@ def wait_imap_verification_link_or_resend(
 
 
 def wait_until_profile_verified(
-        api_manager: ApiManager,
-        email: str,
-        password: str,
-        *,
-        timeout_s: float = 60.0,
-        poll_s: float = 2.0,
+    api_manager: ApiManager,
+    email: str,
+    password: str,
+    *,
+    timeout_s: float = 60.0,
+    poll_s: float = 2.0,
 ) -> None:
     """Ждём isVerified=true после verify во второй вкладке (SPA/API eventual consistency)."""
     deadline = time.time() + timeout_s
@@ -135,7 +134,7 @@ def _access_token_from_auth_json(data: dict) -> str | None:
 
 
 def _try_login_access_token_for_signup_payload(
-        api_manager: ApiManager, signup_payload: dict
+    api_manager: ApiManager, signup_payload: dict
 ) -> str | None:
     """После 409 conflict: возможно пользователь с этим email/password уже есть — логин анонимно."""
     email = signup_payload.get("email")
@@ -156,11 +155,11 @@ def _try_login_access_token_for_signup_payload(
 
 
 def wait_same_email_signup_ready_via_api_probe(
-        api_manager: ApiManager,
-        signup_payload: dict,
-        *,
-        deadline_monotonic: float,
-        poll_s: float,
+    api_manager: ApiManager,
+    signup_payload: dict,
+    *,
+    deadline_monotonic: float,
+    poll_s: float,
 ) -> str | None:
     """Публичный signUp без Bearer: пока `limited_period` — sleep; при 201 — выходим сразу.
 

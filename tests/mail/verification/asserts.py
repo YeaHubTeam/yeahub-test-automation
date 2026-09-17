@@ -34,7 +34,7 @@ def assert_profile_not_verified(api_manager: ApiManager, email: str, password: s
 
 
 def assert_profile_specialization_selected(
-        api_manager: ApiManager, email: str, password: str
+    api_manager: ApiManager, email: str, password: str
 ) -> None:
     """После онбординга в профиле должна быть выбранная специализация (specializationId != 0)."""
     authenticate_with_retries(api_manager, email, password)
